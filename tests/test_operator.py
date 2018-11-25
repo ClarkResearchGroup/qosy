@@ -18,7 +18,12 @@ def test_operator_string():
     assert(str(os3) == os3.name and os3.name == expected_name3)
     
     os4 = qy.OperatorString(['CDag', 'CDag', 'C'], [1, 2, 3], 'Fermion')
+
     assert(os3 == os4)
     assert(hash(os3) == hash(os4))
+
+    os5 = qy.OperatorString(['X', 'Y', 'Z'], [1,2,4], 'Pauli')
+
+    assert(os1 == os5)
 
     assert(os1 != os2)

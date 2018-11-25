@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 import numpy as np
 import itertools as it
+import copy
 
-from .operator import OperatorString
+from .operator import OperatorString, Operator
 from .lattice import Lattice
 
 class Basis:
-    def __init__(self, op_strings):
+    def __init__(self, op_strings=[]):
         self.op_strings = op_strings
         self.indices    = dict()
         
@@ -14,15 +15,49 @@ class Basis:
             op_string = self.op_strings[ind_os]
             self.indices[op_string] = ind_os
 
+        if len(self.indices) != len(self.op_strings):
+            raise ValueError('Tried to create a basis with multiple copies of the same operator string. There were {} operator strings, but only {} uniques ones.'.format(len(self.op_strings),len(self.indices)))
+
+    def index(self, op_string):
+        return self.indices[op_string]
+
+    def __iter__(self):
+        return iter(self.op_strings)
+
     def __getitem__(self, key):
-        if type(key) is OperatorString:
-            return self.indices[key]
+        return self.op_strings[key]
+
+    def __len__(self):
+        return len(self.op_strings)
+
+    def __str__(self):
+        list_strings = []
+        for ind_os in range(len(self.op_strings)):
+            os = self.op_strings[ind_os]
+            list_strings += [str(os), '\n']
+
+        result = ''.join(list_strings)
+        return result
+
+    def __contains__(self, item):
+        return item in self.indices
+
+    def __add__(self, other):
+        if isinstance(other, Basis):
+            new_op_strings = [os for os in other.op_strings if os not in self]
+        elif isinstance(other, OperatorString):
+            new_op_strings = [other]
+        elif isinstance(other, Operator):
+            new_op_strings = [other.op_strings]
         else:
-            return self.op_strings[key]
+            raise TypeError('Cannot add object of type {} to basis.'.format(type(other)))
+
+        return Basis(self.op_strings + new_op_strings)
 
 def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     # The labels of the cluster in sorted order.
-    cluster = np.sort(np.copy(cluster_labels))
+    cluster = copy.deepcopy(cluster_labels)
+    cluster.sort()
     
     op_strings = []
 
@@ -34,7 +69,7 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     if op_type == 'Pauli' or op_type == 'Majorana':
         orbital_ops = ['X', 'Y', 'Z']
         if op_type == 'Majorana':
-            orbital_ops = ['A', 'B', 'C']
+            orbital_ops = ['A', 'B', 'D']
         
         for num_operators in np.arange(1,max_num_operators+1):
             possible_ops    = list(it.product(orbital_ops, repeat=num_operators))
@@ -42,7 +77,7 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
             
             for labels in possible_labels:
                 for ops in possible_ops:
-                    op_string = OperatorString(ops, labels, op_type)
+                    op_string = OperatorString(list(ops), list(labels), op_type)
                     op_strings.append(op_string)
     elif op_type == 'Fermion':
         #op_strings.append('1 ') # The identity operator
@@ -90,9 +125,7 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     return Basis(op_strings)
     
 def distance_basis(lattice, k, R, op_type, tol=1e-10):
-    cluster_labels = []
-    
-    num_positions = len(lattice.positions)
+    num_positions = int(lattice.positions.shape[1])
     distances = np.zeros((num_positions, num_positions))
     for ind1 in range(num_positions):
         pos1 = lattice.positions[:,ind1]
@@ -102,6 +135,10 @@ def distance_basis(lattice, k, R, op_type, tol=1e-10):
             distances[ind1,ind2] = lattice.distance(pos1, pos2)
             distances[ind2,ind1] = distances[ind1,ind2]
             
-    cluster_labels = [[lattice.labels[ind2] for ind2 in range(num_positions) if np.abs(distances[ind1,ind2]-R) <= tol] for ind1 in range(num_positions)]
-    
-    return construct_cluster_basis(k, cluster_labels, op_type)
+    clusters = [[lattice.labels[ind2] for ind2 in range(num_positions) if distances[ind1,ind2] <= R+tol] for ind1 in range(num_positions)]
+
+    total_basis = Basis()
+    for cluster_labels in clusters:
+        total_basis += cluster_basis(k, cluster_labels, op_type)
+
+    return total_basis

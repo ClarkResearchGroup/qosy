@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 import numpy as np
-from .operator import OperatorString
+import scipy.sparse as ss
+
+from .operator import OperatorString, Operator
+from .basis import Basis
 from .tools import sort_sign
 
-def _operation(op_string_A, op_string_B, mode='commutator', tol=1e-12):
+def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12):
     op_type = op_string_A.op_type
     if op_type == 'Pauli':
         (op1,op2,op3) = ('X', 'Y', 'Z')
@@ -83,7 +86,7 @@ def _operation(op_string_A, op_string_B, mode='commutator', tol=1e-12):
     if op_type == 'Pauli':
         # If an odd number of Pauli matrix pairs need to be multiplied, then the
         # two pauli strings from the commutator are imaginary and add together.
-        if mode=='product' or (num_non_trivial_differences % 2 == 1 and mode == 'commutator') or (num_non_trivial_differences % 2 == 0 and mode == 'anticommutator'):
+        if operation_mode=='product' or (num_non_trivial_differences % 2 == 1 and operation_mode == 'commutator') or (num_non_trivial_differences % 2 == 0 and operation_mode == 'anticommutator'):
             coeff *= 1.0 
         # Otherwise, they are real and cancel.
         else:
@@ -94,7 +97,7 @@ def _operation(op_string_A, op_string_B, mode='commutator', tol=1e-12):
         coeff1 *= coeff
         coeff2 *= np.conj(coeff) 
 
-        if mode=='product' or (np.abs(coeff1 - coeff2) > tol and mode == 'commutator') or (np.abs(coeff1 - coeff2) < tol and mode == 'anticommutator'):
+        if operation_mode=='product' or (np.abs(coeff1 - coeff2) > tol and operation_mode == 'commutator') or (np.abs(coeff1 - coeff2) < tol and operation_mode == 'anticommutator'):
             coeff = coeff1
         else:
             coeff = 0.0
@@ -103,16 +106,66 @@ def _operation(op_string_A, op_string_B, mode='commutator', tol=1e-12):
     
     coeff /= op_string_C.prefactor
     
-    if mode != 'product':
+    if operation_mode != 'product':
         coeff *= 2.0
     
     return (coeff, op_string_C)
 
 def product(op_string_A, op_string_B):
-    return _operation(op_string_A, op_string_B, mode='product')
+    return _operation(op_string_A, op_string_B, operation_mode='product')
 
 def commutator(op_string_A, op_string_B):
-    return _operation(op_string_A, op_string_B, mode='commutator')
+    return _operation(op_string_A, op_string_B, operation_mode='commutator')
 
 def anticommutator(op_string_A, op_string_B):
-    return _operation(op_string_A, op_string_B, mode='anticommutator')
+    return _operation(op_string_A, op_string_B, operation_mode='anticommutator')
+
+def structure_constants(basisA, basisB, operation_mode='commutator', tol=1e-12):
+    basisC = Basis()
+    
+    matrix_data = []
+    for ind_os_A in range(len(basisA)):
+        inds_os_C = []
+        inds_os_A = []
+        data      = []
+        
+        os_A = basisA[ind_os_A]
+        for ind_os_B in range(len(basisB)):
+            os_B = basisB[ind_os_B]
+            
+            (coeff, os_C) = _operation(os_A, os_B, operation_mode=operation_mode)
+
+            if np.abs(coeff) > tol and not (mode=='product' and os_A == os_B):
+                basisC += os_C
+                ind_os_C = basisC.index(os_C)
+                
+                inds_os_C.append(ind_os_C)
+                inds_os_A.append(ind_os_A)
+                data.append(coeff)
+                
+        matrix_data.append((inds_os_C, inds_os_A, data))
+        
+    result = []
+    for (inds_os_C, inds_os_A, data) in matrix_data:
+        s_constants_C = ss.csr_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
+        result.append(s_constants_C)
+    
+    return (result, basisC)
+
+def killing_form(basis):
+    (s_constants, _) = structure_constants(basis, basis)
+    
+    # TODO
+
+def commutant_matrix(basis, operator):
+    operator_basis = Basis(operator.op_strings)
+
+    (s_constants, extended_basis) = structure_constants(basis, operator_basis)
+
+    commutant_matrix = ss.csr_matrix(dtype=complex, shape=(len(basis), len(extended_basis)))
+
+    for ind_os in range(len(operator_basis)):
+        matrix = operator.coeffs[ind_os] * s_constants[ind_os]
+        commutant_matrix += (matrix.H).dot(matrix)
+
+    return commutant_matrix

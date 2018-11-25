@@ -95,7 +95,7 @@ class OperatorString:
         return hash(self.name)
 
     def __eq__(self, other):
-        equals = (self.orbital_operators == other.orbital_operators) and (self.orbital_labels == other.orbital_labels) and (self.name == other.name) and (self.op_type == other.op_type)
+        equals = (self.orbital_operators == other.orbital_operators) and (self.orbital_labels == other.orbital_labels) and (self.op_type == other.op_type)
         
         return equals
 

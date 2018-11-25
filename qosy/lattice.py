@@ -127,6 +127,11 @@ class Lattice:
                             self.positions[:,ind_pos] = pos
                             ind_pos += 1
 
+    def distance(self, pos1, pos2):
+        # TODO: implement mirror distance convention
+        # Assumes open boundaries
+        return np.linalg.norm(pos1-pos2)
+                            
     def __str__(self):
         """Convert Lattice object to a string representation of the lattice.
 
