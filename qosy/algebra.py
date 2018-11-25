@@ -124,18 +124,16 @@ def structure_constants(basisA, basisB, operation_mode='commutator', tol=1e-12):
     basisC = Basis()
     
     matrix_data = []
-    for ind_os_A in range(len(basisA)):
+    for os_B in basisB:
         inds_os_C = []
         inds_os_A = []
         data      = []
-        
-        os_A = basisA[ind_os_A]
-        for ind_os_B in range(len(basisB)):
-            os_B = basisB[ind_os_B]
+        for ind_os_A in range(len(basisA)):
+            os_A = basisA[ind_os_A]
             
             (coeff, os_C) = _operation(os_A, os_B, operation_mode=operation_mode)
 
-            if np.abs(coeff) > tol and not (mode=='product' and os_A == os_B):
+            if np.abs(coeff) > tol:
                 basisC += os_C
                 ind_os_C = basisC.index(os_C)
                 
@@ -147,6 +145,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', tol=1e-12):
         
     result = []
     for (inds_os_C, inds_os_A, data) in matrix_data:
+        print(inds_os_C, inds_os_A, data)
         s_constants_C = ss.csr_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
         result.append(s_constants_C)
     

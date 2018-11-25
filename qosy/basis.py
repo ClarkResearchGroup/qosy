@@ -7,7 +7,10 @@ from .operator import OperatorString, Operator
 from .lattice import Lattice
 
 class Basis:
-    def __init__(self, op_strings=[]):
+    def __init__(self, op_strings=None):
+        if op_strings is None:
+            op_strings = []
+        
         self.op_strings = op_strings
         self.indices    = dict()
         
@@ -54,6 +57,31 @@ class Basis:
 
         return Basis(self.op_strings + new_op_strings)
 
+    def __iadd__(self, other):
+        if isinstance(other, Basis):
+            ind = len(self.op_strings)
+            for os in other.op_strings:
+                if os not in self:
+                    self.op_strings.append(os)
+                    self.indices[os] = ind
+                    ind += 1
+        elif isinstance(other, OperatorString):
+            ind = len(self.indices)
+            if other not in self:
+                self.op_strings.append(other)
+                self.indices[other] = ind
+        elif isinstance(other, Operator):
+            ind = len(self.op_strings)
+            for os in other.op_strings:
+                if os not in self:
+                    self.op_strings.append(os)
+                    self.indices[os] = ind
+                    ind += 1
+        else:
+            raise TypeError('Cannot add object of type {} to basis.'.format(type(other)))
+
+        return self
+
 def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     # The labels of the cluster in sorted order.
     cluster = copy.deepcopy(cluster_labels)
@@ -80,8 +108,6 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                     op_string = OperatorString(list(ops), list(labels), op_type)
                     op_strings.append(op_string)
     elif op_type == 'Fermion':
-        #op_strings.append('1 ') # The identity operator
-        
         for num_operators_forward in np.arange(1,max_num_operators+1):
             possible_labels_forward = list(it.combinations(cluster, num_operators_forward))
             
@@ -140,5 +166,6 @@ def distance_basis(lattice, k, R, op_type, tol=1e-10):
     total_basis = Basis()
     for cluster_labels in clusters:
         total_basis += cluster_basis(k, cluster_labels, op_type)
-
+        #total_basis = total_basis + cluster_basis(k, cluster_labels, op_type)
+        
     return total_basis

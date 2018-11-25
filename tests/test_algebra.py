@@ -41,13 +41,8 @@ def test_product_pauli():
     for ind_random in range(num_random_operators):
         os3 = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Pauli')
         os4 = os3
-
-        print(os3)
-        print(os4)
         
         (coeff_prod34, os_prod34) = qy.product(os3, os4)
-
-        print(os_prod34)
         
         assert(np.isclose(coeff_prod34, expected_coeff_prod34) and os_prod34 == expected_os_prod34)
 
@@ -74,13 +69,8 @@ def test_commutator_pauli():
     for ind_random in range(num_random_operators):
         os3 = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Pauli')
         os4 = os3
-
-        print(os3)
-        print(os4)
         
         (coeff_prod34, os_prod34) = qy.commutator(os3, os4)
-
-        print(os_prod34)
         
         assert(np.isclose(coeff_prod34, expected_coeff_prod34) and os_prod34 == expected_os_prod34)
 
@@ -107,13 +97,8 @@ def test_anticommutator_pauli():
     for ind_random in range(num_random_operators):
         os3 = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Pauli')
         os4 = os3
-
-        print(os3)
-        print(os4)
         
         (coeff_prod34, os_prod34) = qy.anticommutator(os3, os4)
-
-        print(os_prod34)
         
         assert(np.isclose(coeff_prod34, expected_coeff_prod34) and os_prod34 == expected_os_prod34)
 
@@ -140,13 +125,8 @@ def test_product_majorana():
     for ind_random in range(num_random_operators):
         os3 = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Majorana')
         os4 = os3
-
-        print(os3)
-        print(os4)
         
         (coeff_prod34, os_prod34) = qy.product(os3, os4)
-
-        print(os_prod34)
         
         assert(np.isclose(coeff_prod34, expected_coeff_prod34) and os_prod34 == expected_os_prod34)
 
@@ -173,13 +153,8 @@ def test_commutator_majorana():
     for ind_random in range(num_random_operators):
         os3 = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Majorana')
         os4 = os3
-
-        print(os3)
-        print(os4)
         
         (coeff_prod34, os_prod34) = qy.commutator(os3, os4)
-
-        print(os_prod34)
         
         assert(np.isclose(coeff_prod34, expected_coeff_prod34) and os_prod34 == expected_os_prod34)
 
@@ -207,12 +182,36 @@ def test_anticommutator_majorana():
         os3 = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Majorana')
         os4 = os3
 
-        print(os3)
-        print(os4)
-        
         (coeff_prod34, os_prod34) = qy.anticommutator(os3, os4)
-
-        print(os_prod34)
         
         assert(np.isclose(coeff_prod34, expected_coeff_prod34) and os_prod34 == expected_os_prod34)
+
+
+def test_structure_constants_simple():
+    op_strings_basisA = \
+                        [qy.OperatorString(['X'], [1], 'Pauli'),
+                         qy.OperatorString(['Y'], [1], 'Pauli'),
+                         qy.OperatorString(['Z'], [1], 'Pauli')
+                        ]
+
+    op_strings_basisB = \
+                        [qy.OperatorString(['X', 'X'], [1, 2], 'Pauli')
+                        ]
+
+    op_strings_expected_basisC = \
+                        [qy.OperatorString(['Z', 'X'], [1, 2], 'Pauli'),
+                         qy.OperatorString(['Y', 'X'], [1, 2], 'Pauli')
+                        ]
+    
+    basis_A = qy.Basis(op_strings_basisA)
+    basis_B = qy.Basis(op_strings_basisB)
+    expected_basis_C = qy.Basis(op_strings_expected_basisC)
+
+    expected_structure_constants = np.array([[0,-2j,0],[0,0,2j]],dtype=complex)
+    
+    (structure_constants_list, basis_C) = qy.algebra.structure_constants(basis_A, basis_B)
+
+    assert(np.allclose(structure_constants_list[0].todense(), expected_structure_constants))
+
+    assert(set(basis_C.op_strings) == set(expected_basis_C.op_strings))
 

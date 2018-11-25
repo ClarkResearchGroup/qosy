@@ -52,10 +52,12 @@ def test_distance_basis():
     distance_basis = qy.basis.distance_basis(chain_lattice, k, R, 'Pauli')
 
     print(distance_basis)
+
     print(chain_lattice.labels)
 
     cluster_basis  = qy.basis.cluster_basis(k, chain_lattice.labels, 'Pauli')
 
+    print(cluster_basis)
+    
     assert(set(distance_basis.op_strings) == set(cluster_basis.op_strings))
     
-test_distance_basis()
