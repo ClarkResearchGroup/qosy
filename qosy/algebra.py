@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 import numpy as np
 import scipy.sparse as ss
+import tools
 
-from .operator import OperatorString, Operator
-from .basis import Basis
+from .operator import OperatorString
+from .basis import Basis, Operator
 from .tools import sort_sign
 
 def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12):
@@ -29,8 +30,8 @@ def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12)
         labels_ab_A_times_B = op_string_A._labels_ab_operators + op_string_B._labels_ab_operators
         labels_ab_B_times_A = op_string_B._labels_ab_operators + op_string_A._labels_ab_operators
         
-        (_, sign1) = sort_sign(labels_ab_A_times_B)
-        (_, sign2) = sort_sign(labels_ab_B_times_A)
+        (_, sign1) = tools.sort_sign(labels_ab_A_times_B)
+        (_, sign2) = tools.sort_sign(labels_ab_B_times_A)
 
         coeff1 *= sign1
         coeff2 *= sign2
@@ -146,8 +147,8 @@ def structure_constants(basisA, basisB, operation_mode='commutator', tol=1e-12):
     result = []
     for (inds_os_C, inds_os_A, data) in matrix_data:
         print(inds_os_C, inds_os_A, data)
-        s_constants_C = ss.csr_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
-        result.append(s_constants_C)
+        s_constants_B = ss.csr_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
+        result.append(s_constants_B)
     
     return (result, basisC)
 
@@ -156,15 +157,12 @@ def killing_form(basis):
     
     # TODO
 
-def commutant_matrix(basis, operator):
-    operator_basis = Basis(operator.op_strings)
-
-    (s_constants, extended_basis) = structure_constants(basis, operator_basis)
+def commutant_matrix(basis, operator, operation_mode='commutator'):
+    (s_constants, extended_basis) = structure_constants(basis, operator._basis, operation_mode=operation_mode)
 
     commutant_matrix = ss.csr_matrix(dtype=complex, shape=(len(basis), len(extended_basis)))
 
     for ind_os in range(len(operator_basis)):
-        matrix = operator.coeffs[ind_os] * s_constants[ind_os]
-        commutant_matrix += (matrix.H).dot(matrix)
+        commutant_matrix += operator.coeffs[ind_os] * s_constants[ind_os]
 
     return commutant_matrix
