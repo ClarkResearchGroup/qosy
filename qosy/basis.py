@@ -3,6 +3,7 @@ import numpy as np
 import itertools as it
 import copy
 
+from .config import *
 from .operatorstring import OperatorString
 from .lattice import Lattice
 
@@ -36,7 +37,7 @@ class Basis:
 
         # A dictionary that maps each OperatorString
         # to its index in the list op_strings.
-        self._indices   = dict()
+        self._indices = dict()
         
         for ind_os in range(len(self.op_strings)):
             op_string = self.op_strings[ind_os]
@@ -202,6 +203,145 @@ class Basis:
 
         return self
 
+    def __eq__(self, other):
+        return self.op_strings == other.op_strings and self._indices == other._indices
+
+class Operator:
+    def __init__(self, coeffs=None, op_strings=None, op_type=None):
+        """Construct an object that represents a quantum operator.
+        It is a linear combination of operator strings.
+        
+        Parameters
+        ----------
+        coeffs : ndarray, optional
+            The coefficients in front of the OperatorStrings.
+            If all coefficients are real, then the operator
+            is Hermitian.
+        op_strings : list of OperatorStrings, optional
+            The OperatorStrings that make up this operator.
+        op_type : str, optional
+            The type of OperatorStrings that make up the 
+            operator: 'Pauli', 'Majorana', or 'Fermion'.
+            Deduced from op_strings if non-empty.
+
+        Examples
+        --------
+        To construct a zero operator to use with Pauli strings:
+        >>> zero_op = qosy.Operator(op_type='Pauli')
+        To construct a Heisenberg bond between sites 1 and 2:
+        >>> xx = qosy.opstring('X 1 X 2')
+        >>> yy = qosy.opstring('Y 1 Y 2')
+        >>> zz = qosy.opstring('Z 1 Z 2')
+        >>> bond = qosy.Operator(0.25*numpy.ones(3), [xx,yy,zz])
+        """
+
+        if coeffs is None:
+            self.coeffs = np.array([],dtype=float)
+        else:
+            self.coeffs = coeffs
+            
+        if op_strings is None:
+            op_strings = []
+
+        self._basis  = Basis(op_strings)
+        self.op_type = op_type
+
+        if len(self._basis.op_strings) != 0:
+            self.op_type = self._basis.op_strings[0].op_type
+        elif len(self._basis.op_strings) == 0 and op_type is None:
+            raise ValueError('Cannot create an empty (zero) operator without specifying the op_type.')
+
+    def remove_zeros(self, tol=1e-12):
+        inds_nonzero = np.where(np.abs(self.coeffs) > tol)[0]
+
+        # The non-zero coefficients.
+        new_coeffs = self.coeffs[inds_nonzero]
+        
+        # The non-zero operator strings.
+        new_op_strings = [self._basis.op_strings[ind] for ind in inds_nonzero]
+        
+        # Create a new operator with copies of the old
+        # operators' information, excluding the zeros.
+        new_operator = Operator(new_coeffs, new_op_strings)
+
+        return new_operator
+
+    def __add__(self, other):
+        if self.op_type != other.op_type:
+            raise ValueError('Cannot add operator of op_type {} to operator of op_type {}'.format(self.op_type, other.op_type))
+
+        # Create a new operator with copies of the old
+        # operators' information.
+        new_operator = Operator(np.copy(self.coeffs), copy.deepcopy(self._basis.op_strings))
+
+        # Enlarge the basis.
+        new_operator._basis += other._basis
+
+        # Pad the coefficients vector with zeros
+        # to match the new basis size.
+        new_operator.coeffs = np.pad(new_operator.coeffs, (0,len(new_operator._basis)-len(self._basis)), 'constant')
+
+        # Collect the indices of the other Operator
+        # in the new enlarged basis.
+        inds_new_basis = np.array([new_operator._basis.index(op_string) for op_string in other._basis], dtype=int)
+
+        # Add the other Operator's coefficients
+        # to the enlarged coefficients vector.
+        new_operator.coeffs[inds_new_basis] += other.coeffs
+
+        return new_operator
+
+    def __iadd__(self, other):
+        if self.op_type != other.op_type:
+            raise ValueError('Cannot add operator of op_type {} to operator of op_type {}'.format(self.op_type, other.op_type))
+
+        # Enlarge the basis.
+        old_len = len(self._basis)
+        self._basis += other._basis
+        new_len = len(self._basis)
+
+        # Pad the coefficients vector with zeros
+        # to match the new basis size.
+        self.coeffs = np.pad(self.coeffs, (0,new_len-old_len), 'constant')
+
+        # Collect the indices of the other Operator
+        # in the new enlarged basis.
+        inds_new_basis = np.array([self._basis.index(op_string) for op_string in other._basis], dtype=int)
+
+        # Add the other Operator's coefficients
+        # to the enlarged coefficients vector.
+        self.coeffs[inds_new_basis] += other.coeffs
+
+        return self
+
+    def __mul__(self, other):
+        return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
+
+    def __rmul__(self, other):
+        return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
+    
+    def __sub__(self, other):
+        return self.__add__(-1.0*other)
+
+    def __isub__(self, other):
+        return self.__iadd__(-1.0*other)
+
+    def __len__(self):
+        return len(self._basis)
+    
+    def __str__(self):
+        list_strings = []
+        for ind_coeff in range(len(self.coeffs)):
+            coeff = self.coeffs[ind_coeff]
+            os    = self._basis.op_strings[ind_coeff]
+            list_strings += [str(coeff), ' (', str(os), ')\n']
+
+        result = ''.join(list_strings)
+        return result
+
+    def __eq__(self, other):
+        return self.op_type == other.op_type and (self.coeffs == other.coeffs).all() and self._basis == other._basis
+    
 def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     """Constructs a basis of operator strings from the labels
     of a "cluster" of orbitals. The operator strings in the cluster basis
@@ -244,9 +384,9 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     max_num_operators = np.minimum(len(cluster), k)
 
     if op_type == 'Pauli' or op_type == 'Majorana':
-        orbital_ops = ['X', 'Y', 'Z']
+        orbital_ops = PAULI_OPS
         if op_type == 'Majorana':
-            orbital_ops = ['A', 'B', 'D']
+            orbital_ops = MAJORANA_OPS
         
         for num_operators in np.arange(1,max_num_operators+1):
             possible_ops    = list(it.product(orbital_ops, repeat=num_operators))
@@ -265,7 +405,7 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                 labels_forward  = np.copy(labels)
                 labels_backward = np.copy(labels[::-1])
 
-                ops    = ['CDag ']*len(labels_forward) + ['C ']*len(labels_backward)
+                ops    = ['CDag']*len(labels_forward) + ['C']*len(labels_backward)
                 labels = labels_forward + labels_backward
 
                 op_string = OperatorString(ops, labels, op_type)
@@ -287,12 +427,12 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                     for prefactor in possible_prefactors:
                         for ind_labels_backward in range(max_ind_labels_backward):
                             labels_backward = possible_labels_backward[ind_labels_backward]
-
-                            ops    = ['CDag ']*len(labels_forward) + ['C ']*len(labels_backward)
+                            
+                            ops    = ['CDag']*len(labels_forward) + ['C']*len(labels_backward)
                             labels = labels_forward + labels_backward
-
+                            
                             op_string = OperatorString(ops, labels, op_type, prefactor)
-                
+                            
                             op_strings.append(op_string)
     else:
         raise ValueError('Unknown operator string type: {}'.format(op_type))
@@ -322,83 +462,7 @@ def distance_basis(lattice, k, R, op_type, tol=1e-10):
 """
 
 
-class Operator:
-    def __init__(self, coeffs=[], op_strings=[], op_type=None):
-        """Construct an object that represents a quantum operator.
-        It is a linear combination of operator strings.
-        
-        Parameters
-        ----------
-        coeffs : ndarray, optional
-            The coefficients in front of the OperatorStrings.
-            If all coefficients are real, then the operator
-            is Hermitian.
-        op_strings : list of OperatorStrings, optional
-            The OperatorStrings that make up this operator.
-        op_type : str, optional
-            The type of OperatorStrings that make up the 
-            operator: 'Pauli', 'Majorana', or 'Fermion'.
-            Deduced from op_strings if non-empty.
-
-        Examples
-        --------
-        To construct a zero operator to use with Pauli strings:
-        >>> zero_op = qosy.Operator(op_type='Pauli')
-        To construct a Heisenberg bond between sites 1 and 2:
-        >>> xx = qosy.opstring('X 1 X 2')
-        >>> yy = qosy.opstring('Y 1 Y 2')
-        >>> zz = qosy.opstring('Z 1 Z 2')
-        >>> bond = qosy.Operator(0.25*numpy.ones(3), [xx,yy,zz])
-        """
-        
-        self.coeffs     = coeffs
-        self._basis     = Basis(op_strings)
-        self.op_type    = op_type
-
-        if len(self._basis.op_strings) != 0:
-            self.op_type = self._basis.op_strings[0].op_type
-        elif len(self._basis.op_strings) == 0 and op_type is None:
-            raise ValueError('Cannot create an empty (zero) operator without specifying the op_type.')
-        
-
-    def __add__(self, other):
-        if self.op_type != other.op_type:
-            raise ValueError('Cannot add operator of op_type {} to operator of op_type {}'.format(self.op_type, other.op_type))
-
-        new_operator = Operator(np.copy(self.coeffs), copy.deepcopy(self._basis.op_strings))
-
-        new_operator._basis += other._basis
-        new_operator.coeffs = np.pad(new_operator.coeffs, (0,len(new_operator._basis)-len(self._basis)), 'constant')
-
-        inds_new_basis = np.array([new_operator._basis.index(op_string) for op_string in other._basis], dtype=int)
-
-        new_operator.coeffs[inds_new_basis] += other.coeffs
-        
-
-    def __iadd__(self, other):
-        if self.op_type != other.op_type:
-            raise ValueError('Cannot add operator of op_type {} to operator of op_type {}'.format(self.op_type, other.op_type))
-
-        # If the Operators are in the same basis, just do vector addition.
-        if self.op_strings is other.op_strings:
-            self.coeffs += other.coeffs
-            return self
-        else:
-            raise NotImplmentedError('Cannot add two Operators made of different operator strings (in different bases).')
-
-    def __mul__(self, other):
-        return Operator(self.coeffs * other, self.op_strings, self.op_type)
-
-    def __str__(self):
-        list_strings = []
-        for ind_coeff in range(len(self.coeffs)):
-            coeff = self.coeffs[ind_coeff]
-            os    = self.op_strings[ind_coeff]
-            list_strings += [str(coeff), ' (', str(os), ')\n']
-
-        result = ''.join(list_strings)
-        return result
-
+# TODO:
 def _convert_operator(operator, to_op_type):
     pass
 
