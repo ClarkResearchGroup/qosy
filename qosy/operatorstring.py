@@ -3,6 +3,7 @@ import numpy as np
 import itertools as it
 #import lattice
 
+from config import *
 import tools
 
 class OperatorString:
@@ -67,7 +68,6 @@ class OperatorString:
         # A dictionary of the labels to their index in the operator string.
         self._indices_orbital_labels = dict()
         for ind_orbital in range(len(self.orbital_labels)):
-            print(self.orbital_labels[ind_orbital])
             self._indices_orbital_labels[self.orbital_labels[ind_orbital]] = ind_orbital
         
         # Compute the prefactor automatically if a Majorana operator.

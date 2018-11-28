@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 from .context import qosy as qy
-from qosy.operator import OperatorString
+from qosy.basis import Basis, Operator
+from qosy.operatorstring import OperatorString
 import numpy as np
 
 def test_cluster_basis():
     k = 2
     cluster_labels = [1,2]
-    basis = qy.basis.cluster_basis(k, cluster_labels, 'Pauli')
+    basis = qy.cluster_basis(k, cluster_labels, 'Pauli')
 
     expected_op_strings =  \
     [OperatorString(['X'], [1], 'Pauli'), OperatorString(['X'], [2], 'Pauli'), \
@@ -25,7 +26,7 @@ def test_cluster_basis():
 
     k = 2
     cluster_labels = [1,2]
-    basis = qy.basis.cluster_basis(k, cluster_labels, 'Majorana')
+    basis = qy.cluster_basis(k, cluster_labels, 'Majorana')
 
     expected_op_strings =  \
     [OperatorString(['A'], [1], 'Majorana'), OperatorString(['A'], [2], 'Majorana'), \
@@ -41,7 +42,52 @@ def test_cluster_basis():
 
     assert(set(basis.op_strings) == set(expected_op_strings))
 
+def test_basis_addition():
+    k = 2
+    cluster_labelsA = [1,2]
+    cluster_labelsB = [2,3]
+    cluster_labelsC = [3,4]
 
+    basisA = qy.cluster_basis(k, cluster_labelsA, 'Majorana')
+    basisB = qy.cluster_basis(k, cluster_labelsB, 'Majorana')
+    basisC = qy.cluster_basis(k, cluster_labelsC, 'Majorana')
+
+    basisAB1 = basisA + basisB
+    basisAB2 = Basis()
+    basisAB2 += basisA
+    basisAB2 += basisB
+    
+    basisAC1 = basisA + basisC
+    basisAC2 = Basis()
+    basisAC2 += basisA
+    basisAC2 += basisC
+
+    assert(basisAB1 == basisAB2)
+    assert(basisAC1 == basisAC2)
+
+def test_operator_addition():
+    heisenberg_bond = Operator(np.array([1.,1.,1.]), [qy.opstring('X 1 X 2'), qy.opstring('Y 1 Y 2'), qy.opstring('Z 1 Z 2')])
+
+    XX_bond = Operator(np.array([1.,1.]), [qy.opstring('X 1 X 2'), qy.opstring('Y 1 Y 2')])
+    
+    sum_bonds1 = heisenberg_bond + XX_bond
+    sum_bonds2 = Operator(op_type='Pauli')
+    sum_bonds2 += heisenberg_bond
+    sum_bonds2 += XX_bond
+    sum_bonds3 = Operator(np.array([2.,2.,1.]), [qy.opstring('X 1 X 2'), qy.opstring('Y 1 Y 2'), qy.opstring('Z 1 Z 2')])
+
+    assert(sum_bonds1 == sum_bonds2)
+    assert(sum_bonds2 == sum_bonds3)
+    
+    sum_bonds4 = heisenberg_bond - XX_bond
+    sum_bonds4 = sum_bonds4.remove_zeros()
+    sum_bonds5 = heisenberg_bond + (-1.0*XX_bond)
+    sum_bonds5 = sum_bonds5.remove_zeros()
+    sum_bonds6 = Operator(np.array([1.]), [qy.opstring('Z 1 Z 2')])
+
+    assert(sum_bonds4 == sum_bonds5)
+    assert(sum_bonds5 == sum_bonds6)
+    
 """
 TODO: equivalent test when properly setup.
 def test_distance_basis():

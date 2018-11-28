@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 
-# The names of the orbital operators for each type of operator string.
-PAULI_OPS    = ['X', 'Y', 'Z']
-MAJORANA_OPS = ['A', 'B', 'D']
-FERMION_OPS  = ['CDag', 'C']
-VALID_OPS    = PAULI_OPS + MAJORANA_OPS + FERMION_OPS
+# Loads global variables.
+from .config import *
 
-# Loads the classes defined in each module.
+# Loads the classes and functions defined in each module.
 from .lattice        import UnitCell, Lattice
-from .operatorstring import OperatorString
-from .basis          import Basis, Operator
+from .operatorstring import OperatorString, opstring
+from .basis          import Basis, Operator, cluster_basis
 from .algebra        import *
 #from .transformation import Transformation
 

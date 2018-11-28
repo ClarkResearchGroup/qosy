@@ -4,9 +4,9 @@ import numpy as np
 
 def _random_op_string(max_num_orbitals, possible_orbital_labels, op_type):
     if op_type == 'Pauli':
-        ops = ['X', 'Y', 'Z']
+        ops = qy.PAULI_OPS
     elif op_type == 'Majorana':
-        ops = ['A', 'B', 'D']
+        ops = qy.MAJORANA_OPS
     else:
         raise NotImplementedError('Cannot create random op_type: {}'.format(op_type))
 

@@ -27,3 +27,18 @@ def test_operator_string():
     assert(os1 == os5)
 
     assert(os1 != os2)
+
+    os5a = qy.opstring('X 1 Y 2 Z 4')
+    os5b = qy.opstring('1.0 X 1 Y 2 Z 4')
+    os5c = qy.opstring('1 X 1 Y 2 Z 4')
+
+    assert(os5 == os5a)
+    assert(os5a == os5b)
+    assert(os5b == os5c)
+
+    identityA = qy.OperatorString([], [], 'Pauli')
+    identityB = qy.opstring('1', 'Pauli')
+    identityC = qy.opstring('I', 'Pauli')
+
+    assert(identityA == identityB)
+    assert(identityB == identityC)

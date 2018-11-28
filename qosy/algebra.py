@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as ss
 import tools
 
-from .operator import OperatorString
+from .operatorstring import OperatorString
 from .basis import Basis, Operator
 from .tools import sort_sign
 
@@ -27,8 +27,8 @@ def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12)
         
         coeff2 = coeff1
         
-        labels_ab_A_times_B = op_string_A._labels_ab_operators + op_string_B._labels_ab_operators
-        labels_ab_B_times_A = op_string_B._labels_ab_operators + op_string_A._labels_ab_operators
+        labels_ab_A_times_B = np.concatenate((op_string_A._labels_ab_operators, op_string_B._labels_ab_operators))
+        labels_ab_B_times_A = np.concatenate((op_string_B._labels_ab_operators, op_string_A._labels_ab_operators))
         
         (_, sign1) = tools.sort_sign(labels_ab_A_times_B)
         (_, sign2) = tools.sort_sign(labels_ab_B_times_A)
