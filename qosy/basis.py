@@ -5,7 +5,6 @@ import copy
 
 from .config import *
 from .operatorstring import OperatorString
-from .lattice import Lattice
 
 class Basis:
     """A Basis object represents a basis of operators
@@ -213,7 +212,7 @@ class Operator:
         
         Parameters
         ----------
-        coeffs : ndarray, optional
+        coeffs : ndarray of complex, optional
             The coefficients in front of the OperatorStrings.
             If all coefficients are real, then the operator
             is Hermitian.
@@ -236,9 +235,9 @@ class Operator:
         """
 
         if coeffs is None:
-            self.coeffs = np.array([],dtype=float)
+            self.coeffs = np.array([], dtype=complex)
         else:
-            self.coeffs = coeffs
+            self.coeffs = np.array(coeffs, dtype=complex)
             
         if op_strings is None:
             op_strings = []
@@ -265,6 +264,9 @@ class Operator:
         new_operator = Operator(new_coeffs, new_op_strings)
 
         return new_operator
+
+    def norm(self):
+        return np.linalg.norm(self.coeffs)
 
     def __add__(self, other):
         if self.op_type != other.op_type:
@@ -318,6 +320,7 @@ class Operator:
         return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
 
     def __rmul__(self, other):
+        print(self.coeffs)
         return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
     
     def __sub__(self, other):
@@ -460,17 +463,3 @@ def distance_basis(lattice, k, R, op_type, tol=1e-10):
         
     return total_basis
 """
-
-
-# TODO:
-def _convert_operator(operator, to_op_type):
-    pass
-
-def convert(operator, to_op_type):
-    if isinstance(operator, OperatorString):
-        return _convert_operator_string(operator)
-    elif isinstance(operator, Operator):
-        return _convert_operator(operator)
-    else:
-        raise TypeError('Cannot convert invalid operator type: {}'.format(type(operator)))
-

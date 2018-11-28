@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 from .context import qosy as qy
+from helper import _random_op_string
 import numpy as np
 
 def _random_op_string(max_num_orbitals, possible_orbital_labels, op_type):
+    # Creates a random operator string made of up to max_num_orbital
+    # orbitals with labels drawn from possible_orbital_labels.
+    
     if op_type == 'Pauli':
         ops = qy.PAULI_OPS
     elif op_type == 'Majorana':

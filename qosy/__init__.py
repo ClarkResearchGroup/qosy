@@ -7,6 +7,7 @@ from .config import *
 from .lattice        import UnitCell, Lattice
 from .operatorstring import OperatorString, opstring
 from .basis          import Basis, Operator, cluster_basis
+from .conversion     import convert
 from .algebra        import *
 #from .transformation import Transformation
 
