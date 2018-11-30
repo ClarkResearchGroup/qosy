@@ -3,8 +3,8 @@ import numpy as np
 import itertools as it
 #import lattice
 
-from config import *
 import tools
+from .config import *
 
 class OperatorString:
     """An OperatorString object represents a string 

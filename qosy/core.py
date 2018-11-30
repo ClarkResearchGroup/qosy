@@ -7,13 +7,13 @@ import scipy.sparse.linalg as ssla
 import algebra
 import transformation
 
-def commuting_operators(basis, operator, operation_mode='commutator', num_vecs=None, _sigma=None, _tol=1e-10):
+def commuting_operators(basis, operator, operation_mode='commutator', num_vecs=None, return_com_matrix=False, _sigma=None, _tol=1e-10):
     commutant_matrix = algebra.commutant_matrix(basis, operator, operation_mode=operation_mode)
 
     CDagC = (commutant_matrix.H).dot(commutant_matrix)
 
     if num_vecs is None:
-        (evals, evecs) = nla.eigh(CDagC.todense())
+        (evals, evecs) = nla.eigh(CDagC.toarray())
     else:
         # Use a small negative sigma for the shift-invert method.
         if _sigma is None:
@@ -26,9 +26,12 @@ def commuting_operators(basis, operator, operation_mode='commutator', num_vecs=N
     if num_vecs is not None and len(inds_ns) == num_vecs:
         warnings.warn('All {} vectors found with eigsh were in the null space. Increase num_vecs to ensure that you are not missing null vectors.'.format(num_vecs))
 
-    return null_space
+    if return_com_matrix:
+        return (null_space, commutant_matrix)
+    else:
+        return null_space
 
-def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=None, _tol=1e-10):
+def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=None, return_sym_matrix=False, _tol=1e-10):
     symmetry_matrix = transformation.symmetry_matrix(basis, transform)
     
     if operation_mode in ['commute', 'Commute', 'symmetry', 'commutator']:
@@ -41,7 +44,7 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
     matrix = 0.5*(symmetry_matrix + symmetry_matrix.H)
 
     if num_vecs is None:
-        (evals, evecs) = nla.eigh(matrix.todense())
+        (evals, evecs) = nla.eigh(matrix.toarray())
     else:
         (evals, evecs) = ssla.eigsh(matrix, k=num_vecs, sigma=sign)
 
@@ -50,5 +53,8 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
 
     if num_vecs is not None and len(inds) == num_vecs:
         warnings.warn('All {} vectors found with eigsh were in the ({})-eigenvalue subspace. Increase num_vecs to ensure that you are not missing null vectors.'.format(num_vecs, sign))
-    
-    return vecs
+
+    if return_sym_matrix:
+        return (vecs, symmetry_matrix)
+    else:
+        return vecs

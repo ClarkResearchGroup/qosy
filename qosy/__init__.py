@@ -9,7 +9,7 @@ from .operatorstring import OperatorString, opstring
 from .basis          import Basis, Operator, cluster_basis
 from .conversion     import convert, conversion_matrix
 from .algebra        import *
-#from .transformation import Transformation
+from .transformation import Transformation
 
 # Loads the utility functions.
 from .tools          import *

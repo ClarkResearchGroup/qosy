@@ -4,21 +4,115 @@ import scipy.sparse as ss
 
 import tools
 from .operatorstring import OperatorString
+from .basis import Operator
+
+class Transformation:
+    def __init__(self, rule, info):
+        """Construct a Transformation object that 
+        represents a symmetry transformation that
+        acts on the Hilbert space of states.
+
+        Parameters
+        ----------
+        rule : Operator = function(OperatorString, info_type)
+            The transformation rule is a 
+            user-supplied function that takes in
+            an OperatorString and additional info
+            and returns an Operator representing
+            the effect of the transformation on 
+            the OperatorString.
+        info : info_type
+            The information provided to the
+            transformation rule function.
+        """
+        
+        self.rule = rule
+        self.info = info
+        
+    def apply(self, operator):
+        """Apply the transformation to an operator.
+
+        Parameters
+        ----------
+        operator : OperatorString or Operator
+            The operator to apply the transformation to.
+
+        Returns
+        -------
+        Operator
+            The transformed operator.
+        """
+        
+        if isinstance(operator, OperatorString):
+            return self.rule(operator, self.info)
+        elif isinstance(operator, Operator):
+            result = Operator(op_type=operator.op_type)
+            for (coeff, op_string) in operator:
+                result += coeff * self.rule(op_string, self.info)
+        else:
+            raise TypeError('Cannot apply the transformation to object of type {}'.format(type(operator)))
+
+    def _product_rule(op_string_A, info, tol=1e-12):
+        # Transformation rule for an operator 
+        # that is a product of two operators: U = D*C.
+        # U h_a U^{-1} = D C h_a C^{-1} D^{-1}
+        
+        # The information contains the rules for the C and D operators.
+        (ruleC, infoC, ruleD, infoD) = info
+        
+        result = Operator(op_type=op_string_A.op_type)
+        
+        operatorC = ruleC(op_string_A, infoC)
+            
+        for (coeffC, op_string_C) in operatorC:
+            operatorD = ruleD(op_string_C, infoD)
+            for (coeffD, op_string_D) in operatorD:
+                coeffB      = coeffC * coeffD
+                op_string_B = op_string_D
+                if np.abs(coeffB) > tol:
+                    result += Operator(np.array([coeffB]), [op_string_B])
+                        
+        return result
+
+    def __mul__(self, other):
+        product_info = (self.rule, self.info, other.rule, other.info)
+        return Transformation(_product_rule, product_info)      
 
 def symmetry_matrix(basis, transformation, tol=1e-12):
-    dim_basis = len(basis)
+    """Create the symmetry matrix that represents the
+    effect of the transformation on the basis of 
+    OperatorStrings.
 
-    (rule, info) = transformation
+    For a unitary (or antiunitary) transformation
+    operator U and a basis of operator strings h_a,
+    the symmetry matrix M is defined through
+        U h_a U^{-1} = \sum_b M_{ba} h_b
+
+    Parameters
+    ----------
+    basis : Basis
+        The Basis of OperatorStrings used to
+        represent the symmetry matrix.
+    transformation : Transformation
+        The Transformation on the OperatorStrings.
+    
+    Returns
+    -------
+    scipy.sparse.csc_matrix of complex
+        A sparse, not-necessarily-unitary complex matrix.
+    """
+
+    dim_basis = len(basis)
 
     row_inds = []
     col_inds = []
     data     = []
-    for indA in range(len(basis)):
+    for indA in range(dim_basis):
         op_string_A = basis[indA]
 
-        (coeffs_B, op_strings_B) = rule(op_string_A, info)
-
-        for (coeff_B, op_string_B) in zip(coeffs_B, op_strings_B):
+        operatorB = transformation.apply(op_string_A)
+        
+        for (coeff_B, op_string_B) in operatorB:
             
             # Ignore operators not currently in the basis.
             # If there are operators outside of the basis, this
@@ -29,11 +123,11 @@ def symmetry_matrix(basis, transformation, tol=1e-12):
             indB = basis.index(op_string_B)
 
             if np.abs(coeff_B) > tol:
-                row_inds.append(indA)
-                col_inds.append(indB)
+                row_inds.append(indB)
+                col_inds.append(indA)
                 data.append(coeff_B)
 
-    symmetry_matrix = ss.csr_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(dim_basis, dim_basis))
+    symmetry_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(dim_basis, dim_basis))
             
     return symmetry_matrix
 
@@ -49,19 +143,19 @@ def _permutation_rule(op_string_A, info):
     if not (op_type == 'Pauli' or op_type == 'Majorana'):
         raise ValueError('Invalid op_type: {}'.format(op_type))
 
-    # The information is a function that specifies how labels map into other labels.
-    relabeler = info
+    # The information is a permutation that specifies how labels map into other labels.
+    permuration = info
     
     coeffB = 1.0
     
     ops    = op_string_A.orbital_operators
     labels = op_string_A.orbital_labels
     
-    new_labels_unsorted = [relabeler(l) for l in labels]
+    new_labels_unsorted = np.array([permutation[l] for l in labels], dtype=int)
     inds_sorted         = np.argsort(new_labels_unsorted)
 
     new_ops     = [ops[ind] for ind in inds_sorted]
-    new_labels  = [new_labels_unsorted[ind] for ind in inds_sorted]
+    new_labels  = new_labels_unsorted[inds_sorted]
 
     op_string_B = OperatorString(new_ops, new_labels, op_string_A.op_type)
 
@@ -77,7 +171,7 @@ def _permutation_rule(op_string_A, info):
         # string operators before and after the transformation.
         coeffB *= np.real(op_string_B.prefactor/op_string_A.prefactor * sign)     
 
-    return ([coeffB], [op_string_B])
+    return Operator([coeffB], [op_string_B])
 
 def _time_reversal_rule(op_string_A, info):
     """Transformation rule for time-reversal symmetry T.
@@ -133,7 +227,7 @@ def _time_reversal_rule(op_string_A, info):
         if np.abs(extra_sign - 1.0) > tol:
             raise NotImplementedError('Unsupported for spin-1/2 operators.')
 
-    return ([coeffB], [op_string_B])
+    return Operator([coeffB], [op_string_B])
 
 def _particle_hole_rule(op_string_A, info):
     """Transformation rule for particle hole symmetry C.
@@ -179,44 +273,13 @@ def _particle_hole_rule(op_string_A, info):
     if numABs % 2 == 1:
         coeffB *= extra_sign
             
-    return ([coeffB], [op_string_B])
+    return Operator([coeffB], [op_string_B])
 
-def _product_rule(op_string_A, info, tol=1e-12):
-    """Transformation rule for an operator 
-    that is a product of two operators: U = D*C.
-    U H U^{-1} = D C H C^{-1} D^{-1}.
-    """
-    
-    # The information contains the rules for the C and D operators.
-    (ruleC, infoC, ruleD, infoD) = info
-
-    (coeffs_C, op_strings_C) = ruleC(op_string_A, infoC)
-
-    coeffs_B     = []
-    op_strings_B = []
-    for (coeffC, op_string_C) in zip(coeffs_C, op_strings_C):
-        (coeffs_D, op_strings_D) = ruleD(op_string_C, infoD)
-
-        for (coeffD, op_string_D) in zip(coeffs_D, op_strings_D):
-            coeffB      = coeffC * coeffD
-            op_string_B = op_string_D
-            if np.abs(coeffB) > tol:
-                coeffs_B.append(coeffB)
-                op_strings_B.append(op_string_B)
-
-    return (coeffs_B, op_strings_B)
+def label_permutation(permutation):
+    return Transformat(_permutation_rule, permutation)
 
 def time_reversal(sign=1.0):
-    info = sign
-    return (_time_reversal_rule, info)
+    return Transformation(_time_reversal_rule, sign)
 
 def particle_hole(sign=1.0):
-    info = sign
-    return (_particle_hole_rule, info)
-
-def product(transformC, transformD):
-    (ruleC, infoC) = transformC
-    (ruleD, infoD) = transformD
-    info_product = (ruleC, infoC, ruleD, infoD)
-
-    return (_product_rule, info_product)
+    return Transformation(_particle_hole_rule, sign)

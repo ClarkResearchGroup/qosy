@@ -7,7 +7,7 @@ def sort_sign(vector, tol=1e-10):
 
     Parameters
     ----------
-    vector : array_like of numbers
+    vector : ndarray of numbers
         The vector to sort.
     
     Returns

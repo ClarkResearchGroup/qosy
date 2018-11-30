@@ -4,10 +4,10 @@ import numpy as np
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
 
+import tools
 from .config import *
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
-import tools
 
 def _fermion_string_from_cdag_c_labels(prefactor, c_dag_labels, c_labels):
     # Construct a fermion string operator from the labels of the creation and
