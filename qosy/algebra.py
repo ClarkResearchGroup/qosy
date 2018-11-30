@@ -147,7 +147,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', tol=1e-12):
     result = []
     for (inds_os_C, inds_os_A, data) in matrix_data:
         print(inds_os_C, inds_os_A, data)
-        s_constants_B = ss.csr_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
+        s_constants_B = ss.csc_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
         result.append(s_constants_B)
     
     return (result, basisC)
@@ -160,7 +160,7 @@ def killing_form(basis):
 def commutant_matrix(basis, operator, operation_mode='commutator'):
     (s_constants, extended_basis) = structure_constants(basis, operator._basis, operation_mode=operation_mode)
 
-    commutant_matrix = ss.csr_matrix(dtype=complex, shape=(len(basis), len(extended_basis)))
+    commutant_matrix = ss.csc_matrix(dtype=complex, shape=(len(basis), len(extended_basis)))
 
     for ind_os in range(len(operator_basis)):
         commutant_matrix += operator.coeffs[ind_os] * s_constants[ind_os]

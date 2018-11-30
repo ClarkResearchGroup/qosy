@@ -34,10 +34,10 @@ class OperatorString:
         
         Parameters
         ----------
-        orbital_operators : list of str
+        orbital_operators : list or ndarray of str
             A list of the names of the operators on the orbitals. 
             Ex: 'X','Y', or 'Z' for Pauli strings.
-        orbital_labels : list or array of int
+        orbital_labels : list or ndarray of int
             A list or ndarray of the (unique) integer label of each orbital.
         op_type : str
             Specifies the type of operator string considered: 'Pauli', 
@@ -55,7 +55,7 @@ class OperatorString:
         >>> OperatorString(['CDag', 'CDag', 'C'], [1, 2, 3], 'Fermion')
         """
 
-        self.orbital_operators = orbital_operators
+        self.orbital_operators = np.array(orbital_operators, dtype=str)
         self.orbital_labels    = np.array(orbital_labels, dtype=int)
         self.op_type           = op_type
 
@@ -102,7 +102,7 @@ class OperatorString:
         return hash(self.name)
 
     def __eq__(self, other):
-        equals = (self.orbital_operators == other.orbital_operators) and (self.orbital_labels == other.orbital_labels).all() and (self.op_type == other.op_type)
+        equals = (len(self.orbital_operators) == len(other.orbital_operators)) and (self.orbital_operators == other.orbital_operators).all() and (self.orbital_labels == other.orbital_labels).all() and (self.op_type == other.op_type)
         
         return equals
 

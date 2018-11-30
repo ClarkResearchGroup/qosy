@@ -1,6 +1,8 @@
 #!/usr/bin/env python
-import numpy as np
 import itertools as it
+import numpy as np
+import scipy.sparse as ss
+import scipy.sparse.linalg as ssla
 
 from .config import *
 from .operatorstring import OperatorString
@@ -15,11 +17,11 @@ def _fermion_string_from_cdag_c_labels(prefactor, c_dag_labels, c_labels):
     c_labels_reversed = c_labels_reversed[::-1]
     
     orbital_operators = ['CDag']*len(c_dag_labels) + ['C']*len(c_labels)
-    orbital_labels    = c_dag_labels + c_labels_reversed
+    orbital_labels    = np.concatenate((c_dag_labels, c_labels_reversed))
     
     return OperatorString(orbital_operators, orbital_labels, prefactor=prefactor, op_type='Fermion')
 
-def _convert_majorana_string(op_string, include_identity=False):
+def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
     # Converts a Majorana StringOperator to an Operator
     # that is a linear combination of Fermion StringOperators.
     
@@ -30,7 +32,7 @@ def _convert_majorana_string(op_string, include_identity=False):
     labels = op_string.orbital_labels
 
     # The identity operator.
-    if len(ops) == 0:
+    if len(ops) == 0 and include_identity:
         return Operator(np.array([1.0]), [OperatorString([], [], 'Fermion')])
     
     # Used to make sure that the fermion labels end up normal ordered.
@@ -87,12 +89,8 @@ def _convert_majorana_string(op_string, include_identity=False):
                     coeff *= 1.0
 
         # Resulting operator is identity I.
-        if len(fermion_labels) == 0:
-            if include_identity:
-                coeffs_fermion.append(coeff)
-                op_strings_fermion.append(OperatorString([], [], 'Fermion'))
-            else:
-                continue
+        if len(fermion_labels) == 0 and not include_identity:
+            continue
         
         (sorted_fermion_labels, sign) = tools.sort_sign(fermion_labels)
         coeff *= sign
@@ -102,7 +100,7 @@ def _convert_majorana_string(op_string, include_identity=False):
         # The j_1,\ldots,j_m labels
         c_labels    = large_number - sorted_fermion_labels[num_cdags:]
         c_labels    = c_labels[::-1]
-
+        
         lex_order = tools.compare(cdag_labels, c_labels)
         
         # Resulting operator is not lexicographically sorted. Ignore it.
@@ -113,16 +111,16 @@ def _convert_majorana_string(op_string, include_identity=False):
             coeffs_fermion.append(coeff)
             op_strings_fermion.append(_fermion_string_from_cdag_c_labels(1.0, cdag_labels, c_labels))
         # Resulting operator is of type 2: c^\dagger_{i_1} \cdots c^\dagger_{i_m} c_{j_l} \cdots c_{j_1} + H.c.
-        elif lex_order > 0 and np.abs(np.imag(coeff)) < threshold:
+        elif lex_order > 0 and np.abs(np.imag(coeff)) < tol:
             coeffs_fermion.append(np.real(coeff))
             op_strings_fermion.append(_fermion_string_from_cdag_c_labels(1.0, cdag_labels, c_labels))
         # Resulting operator is of type 3: ic^\dagger_{i_1} \cdots c^\dagger_{i_m} c_{j_l} \cdots c_{j_1} + H.c.
-        elif lex_order > 0 and np.abs(np.real(coeff)) < threshold:
+        elif lex_order > 0 and np.abs(np.real(coeff)) < tol:
             coeffs_fermion.append(np.real(coeff/(1j)))
             op_strings_fermion.append(_fermion_string_from_cdag_c_labels(1j, cdag_labels, c_labels))
         else:
             raise ValueError('Invalid lex_order = {} and coeff = {}'.format(lex_order, coeff))
-    
+
     return Operator(np.array(coeffs_fermion), op_strings_fermion)
 
 
@@ -130,8 +128,11 @@ def _convert_fermion_string(op_string, include_identity=False, tol=1e-12):
     # Converts a Fermion OperatorString into a linear
     # combination of Majorana OperatorStrings.
 
+    # Obtain the labels of the CDag and C operators (in ascending order).
     cdag_labels = [o_lab for (o_lab, o_op) in zip(op_string.orbital_labels, op_string.orbital_operators) if o_op == 'CDag']
     c_labels    = [o_lab for (o_lab, o_op) in zip(op_string.orbital_labels, op_string.orbital_operators) if o_op == 'C']
+    c_labels    = c_labels[::-1]
+    
     
     # Store the operator type (C, CDag, CDagC) of every label.
     label_types = dict()
@@ -168,37 +169,37 @@ def _convert_fermion_string(op_string, include_identity=False, tol=1e-12):
     # 1 for c_j is i/2 b_j, 0 for c^\dagger_j c_j is -1/2 d_j.
     possible_term_choices = list(it.product([0,1], repeat=num_ops))
     for term_choice in possible_term_choices:
-        coeffM  = op_string.prefactor * sign
+        coeffM  = 1.0 #op_string.prefactor * sign
         opNameM = ''
         orbital_operators = []
         orbital_labels    = []
-        for indOp in range(num_ops):
-            (op, op_label) = ops[indOp]
+        for ind_op in range(num_ops):
+            (op, op_label) = ops[ind_op]
 
-            if op == 'CDag' and term_choice[indOp] == 0:
+            if op == 'CDag' and term_choice[ind_op] == 0:
                 coeffM *= 0.5
                 orbital_operators.append('A')
                 orbital_labels.append(op_label)
-            elif op == 'CDag' and term_choice[indOp] == 1:
+            elif op == 'CDag' and term_choice[ind_op] == 1:
                 coeffM *= -0.5j
                 orbital_operators.append('B')
                 orbital_labels.append(op_label)
-            elif op == 'C' and term_choice[indOp] == 0:
+            elif op == 'C' and term_choice[ind_op] == 0:
                 coeffM *= 0.5
                 orbital_operators.append('A')
                 orbital_labels.append(op_label)
-            elif op == 'C' and term_choice[indOp] == 1:
+            elif op == 'C' and term_choice[ind_op] == 1:
                 coeffM *= 0.5j
                 orbital_operators.append('B')
                 orbital_labels.append(op_label)
-            elif op == 'CDagC' and term_choice[indOp] == 0:
+            elif op == 'CDagC' and term_choice[ind_op] == 0:
                 coeffM *= -0.5
                 orbital_operators.append('D')
                 orbital_labels.append(op_label)
-            elif op == 'CDagC' and term_choice[indOp] == 1:
+            elif op == 'CDagC' and term_choice[ind_op] == 1:
                 coeffM *= 0.5
             else:
-                raise ValueError('Invalid op and term_choice: {} {}'.format(op, term_choice[indOp]))
+                raise ValueError('Invalid op and term_choice: {} {}'.format(op, term_choice[ind_op]))
 
         # Ignore the identity operator.
         if len(orbital_operators) == 0 and not include_identity:
@@ -207,6 +208,8 @@ def _convert_fermion_string(op_string, include_identity=False, tol=1e-12):
         op_string_M = OperatorString(orbital_operators, orbital_labels, 'Majorana')
         
         coeffM /= op_string_M.prefactor
+        coeffM *= sign
+        coeffM *= op_string.prefactor
 
         # The type 2 and 3 fermion strings have a Hermitian conjugate: (CDag ... C ...) + H.c.,
         # that ensures that the resulting operators are Hermitian. In our conversion,
@@ -298,3 +301,81 @@ def convert(operator, to_op_type, include_identity=False):
     else:
         raise TypeError('Cannot convert invalid operator type: {}'.format(type(operator)))
 
+def conversion_matrix(basis_from, basis_to, tol=1e-12):
+    """Constructs a basis transformation matrix for
+    converting between two different Bases of 
+    OperatorStrings.
+
+    Consider an operator of the form 
+    O = \sum_a J_a h_a = \sum_b J_b' h_b'
+    where h_a and h_b' are operator string
+    basis vectors from two different bases.
+
+    The transformation matrix B_{ba} that
+    this method computes satisfies 
+        h_a = \sum_b B_{ba} h_b'
+    or 
+          h = B h'
+    in matrix-vector notation. If the h_a 
+    form an orthonormal basis, then
+       J'_b = \sum_a B_{ba} J_a  
+    or 
+         J' = B J
+    in matrix-vector notation
+    
+    Parameters
+    ----------
+    basis_from : Basis, (d,)
+        The Basis of OperatorStrings to convert from.
+    basis_to : Basis, (d,)
+        The Basis of OperatorStrings to convert to.
+
+    Returns
+    -------
+    scipy.sparse.csc_matrix of complex, (d,d)
+        A sparse, invertible basis transformation matrix.
+
+    Examples
+    --------
+    To convert between bases of Majorana and Fermion strings:
+    >>> basisA = qosy.cluster_basis(2, [1,2], 'Majorana')
+    >>> basisB = qosy.cluster_basis(2, [1,2], 'Fermion')
+    >>> B = qosy.conversion_matrix(basisA, basisB)
+    The inverse transformation matrix can be built in two ways:
+    >>> import scipy.sparse.linalg as sla
+    >>> Binv = sla.inv(B)
+    >>> Binv = qosy.conversion_matrix(basisB, basisA)
+    """
+
+    if len(basis_from) != len(basis_to):
+        raise ValueError('Cannot create an invertible transformation matrix between bases of different sizes: {} {}'.format(len(basis_from), len(basis_to)))
+
+    if len(basis_from) == 0:
+        return ss.csc_matrix(dtype=complex,shape=(0,0))
+    
+    to_op_type = basis_to.op_strings[0].op_type
+    
+    # Collect the entries of the sparse conversion matrix.
+    row_inds = []
+    col_inds = []
+    data     = []
+    
+    for ind_from in range(len(basis_from)):
+        op_string_from        = basis_from[ind_from]
+        converted_operator_to = convert(op_string_from, to_op_type)
+
+        for (coeff, op_string_to) in converted_operator_to:
+            if np.abs(coeff) > tol:
+                ind_to = basis_to.index(op_string_to)
+
+                row_inds.append(ind_to)
+                col_inds.append(ind_from)
+                data.append(coeff)
+
+    conversion_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(basis_from), len(basis_to)))
+
+    conversion_matrix.sum_duplicates()
+    conversion_matrix.eliminate_zeros()
+
+    return conversion_matrix
+    

@@ -42,6 +42,21 @@ def test_cluster_basis():
 
     assert(set(basis.op_strings) == set(expected_op_strings))
 
+    k = 2
+    cluster_labels = [1,2]
+    basis = qy.cluster_basis(k, cluster_labels, 'Fermion')
+
+    expected_op_strings = \
+    [qy.opstring('CDag 1 C 1'), qy.opstring('CDag 2 C 2'), qy.opstring('CDag 1 CDag 2 C 2 C 1'),
+     qy.opstring('CDag 1'), qy.opstring('1j CDag 1'),
+     qy.opstring('CDag 2'), qy.opstring('1j CDag 2'),
+     qy.opstring('CDag 2 C 1'), qy.opstring('1j CDag 2 C 1'),
+     qy.opstring('CDag 1 CDag 2'), qy.opstring('1j CDag 1 CDag 2'),
+     qy.opstring('CDag 1 CDag 2 C 1'), qy.opstring('1j CDag 1 CDag 2 C 1'),
+     qy.opstring('CDag 1 CDag 2 C 2'), qy.opstring('1j CDag 1 CDag 2 C 2')]
+
+    assert(set(basis.op_strings) == set(expected_op_strings))
+    
 def test_basis_addition():
     k = 2
     cluster_labelsA = [1,2]

@@ -268,6 +268,9 @@ class Operator:
     def norm(self):
         return np.linalg.norm(self.coeffs)
 
+    def normalize(self):
+        self.coeffs /= self.norm()
+
     def __add__(self, other):
         if self.op_type != other.op_type:
             raise ValueError('Cannot add operator of op_type {} to operator of op_type {}'.format(self.op_type, other.op_type))
@@ -320,7 +323,6 @@ class Operator:
         return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
 
     def __rmul__(self, other):
-        print(self.coeffs)
         return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
     
     def __sub__(self, other):
@@ -329,6 +331,9 @@ class Operator:
     def __isub__(self, other):
         return self.__iadd__(-1.0*other)
 
+    def __iter__(self):
+        return iter(zip(self.coeffs, self._basis.op_strings))
+    
     def __len__(self):
         return len(self._basis)
     
@@ -343,7 +348,7 @@ class Operator:
         return result
 
     def __eq__(self, other):
-        return self.op_type == other.op_type and (self.coeffs == other.coeffs).all() and self._basis == other._basis
+        return self.op_type == other.op_type and (len(self.coeffs) == len(other.coeffs)) and (self.coeffs == other.coeffs).all() and self._basis == other._basis
     
 def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     """Constructs a basis of operator strings from the labels
@@ -409,7 +414,7 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                 labels_backward = np.copy(labels[::-1])
 
                 ops    = ['CDag']*len(labels_forward) + ['C']*len(labels_backward)
-                labels = labels_forward + labels_backward
+                labels = np.concatenate((labels_forward, labels_backward))
 
                 op_string = OperatorString(ops, labels, op_type)
                 
@@ -426,13 +431,13 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                     if num_operators_backward == num_operators_forward:
                         max_ind_labels_backward = ind_labels_forward
                 
-                    possible_prefactors = [1, 1j]
+                    possible_prefactors = [1.0, 1j]
                     for prefactor in possible_prefactors:
                         for ind_labels_backward in range(max_ind_labels_backward):
                             labels_backward = possible_labels_backward[ind_labels_backward]
                             
                             ops    = ['CDag']*len(labels_forward) + ['C']*len(labels_backward)
-                            labels = labels_forward + labels_backward
+                            labels = np.concatenate((labels_forward, labels_backward))
                             
                             op_string = OperatorString(ops, labels, op_type, prefactor)
                             
