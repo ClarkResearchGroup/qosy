@@ -28,9 +28,9 @@ class Transformation:
         
         self.rule = rule
         self.info = info
-        
-    def apply(self, operator):
-        """Apply the transformation to an operator.
+
+    def apply(self, operator, tol=1e-12):
+        """Apply the transformation U to an operator string h_a.
 
         Parameters
         ----------
@@ -40,7 +40,7 @@ class Transformation:
         Returns
         -------
         Operator
-            The transformed operator.
+            The transformed operator U h_a U^{-1}.
         """
         
         if isinstance(operator, OperatorString):
@@ -48,10 +48,14 @@ class Transformation:
         elif isinstance(operator, Operator):
             result = Operator(op_type=operator.op_type)
             for (coeff, op_string) in operator:
+                if np.abs(np.imag(coeff)) > tol:
+                    raise NotImplementedError('Operators with complex coefficients are currently not supported with transformations (time-reversal might behave incorrectly).')
+                
                 result += coeff * self.rule(op_string, self.info)
         else:
             raise TypeError('Cannot apply the transformation to object of type {}'.format(type(operator)))
 
+    @staticmethod
     def _product_rule(op_string_A, info, tol=1e-12):
         # Transformation rule for an operator 
         # that is a product of two operators: U = D*C.
@@ -69,67 +73,15 @@ class Transformation:
             for (coeffD, op_string_D) in operatorD:
                 coeffB      = coeffC * coeffD
                 op_string_B = op_string_D
+                
                 if np.abs(coeffB) > tol:
                     result += Operator(np.array([coeffB]), [op_string_B])
                         
         return result
 
     def __mul__(self, other):
-        product_info = (self.rule, self.info, other.rule, other.info)
-        return Transformation(_product_rule, product_info)      
-
-def symmetry_matrix(basis, transformation, tol=1e-12):
-    """Create the symmetry matrix that represents the
-    effect of the transformation on the basis of 
-    OperatorStrings.
-
-    For a unitary (or antiunitary) transformation
-    operator U and a basis of operator strings h_a,
-    the symmetry matrix M is defined through
-        U h_a U^{-1} = \sum_b M_{ba} h_b
-
-    Parameters
-    ----------
-    basis : Basis
-        The Basis of OperatorStrings used to
-        represent the symmetry matrix.
-    transformation : Transformation
-        The Transformation on the OperatorStrings.
-    
-    Returns
-    -------
-    scipy.sparse.csc_matrix of complex
-        A sparse, not-necessarily-unitary complex matrix.
-    """
-
-    dim_basis = len(basis)
-
-    row_inds = []
-    col_inds = []
-    data     = []
-    for indA in range(dim_basis):
-        op_string_A = basis[indA]
-
-        operatorB = transformation.apply(op_string_A)
-        
-        for (coeff_B, op_string_B) in operatorB:
-            
-            # Ignore operators not currently in the basis.
-            # If there are operators outside of the basis, this
-            # will make the symmetry matrix non-unitary.
-            if op_string_B not in basis:
-                continue
-            
-            indB = basis.index(op_string_B)
-
-            if np.abs(coeff_B) > tol:
-                row_inds.append(indB)
-                col_inds.append(indA)
-                data.append(coeff_B)
-
-    symmetry_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(dim_basis, dim_basis))
-            
-    return symmetry_matrix
+        product_info = (other.rule, other.info, self.rule, self.info)
+        return Transformation(Transformation._product_rule, product_info)      
 
 def _permutation_rule(op_string_A, info):
     """Transformation rule to perform a permutation of orbital labels.
@@ -140,11 +92,11 @@ def _permutation_rule(op_string_A, info):
         a_i -> \sum_j U_{ji} a_j, b_i -> \sum_j U_{ji} b_j, d_i -> \sum_j U_{ji} d_j
     where U_{ji} is a permutation matrix with a single 1 on each row/column.
     """
-    if not (op_type == 'Pauli' or op_type == 'Majorana'):
-        raise ValueError('Invalid op_type: {}'.format(op_type))
+    if not (op_string_A.op_type == 'Pauli' or op_string_A.op_type == 'Majorana'):
+        raise ValueError('Invalid op_type: {}'.format(op_string_A.op_type))
 
     # The information is a permutation that specifies how labels map into other labels.
-    permuration = info
+    permutation = info
     
     coeffB = 1.0
     
@@ -159,8 +111,7 @@ def _permutation_rule(op_string_A, info):
 
     op_string_B = OperatorString(new_ops, new_labels, op_string_A.op_type)
 
-    if op_type == 'Majorana':
-        # TODO: test if this logic is correct
+    if op_string_A.op_type == 'Majorana':
         inds_ab_sorted = [ind for ind in inds_sorted if new_ops[ind] in ['A','B']]
         
         # Make sure to compute the sign acquired from reordering
@@ -169,11 +120,11 @@ def _permutation_rule(op_string_A, info):
         
         # Also, account for the prefactors in front of the Majorana
         # string operators before and after the transformation.
-        coeffB *= np.real(op_string_B.prefactor/op_string_A.prefactor * sign)     
+        coeffB *= np.real(op_string_A.prefactor/op_string_B.prefactor * sign)     
 
     return Operator([coeffB], [op_string_B])
 
-def _time_reversal_rule(op_string_A, info):
+def _time_reversal_rule(op_string_A, info, tol=1e-12):
     """Transformation rule for time-reversal symmetry T.
     Transformation for spins:
         \sigma^a_i -> -\sigma^a_i (means T \sigma^a_i T^{-1} = -\sigma^a_i)
@@ -219,7 +170,7 @@ def _time_reversal_rule(op_string_A, info):
             coeffB *= extra_sign
     else:
         # A minus sign occurs for every Pauli matrix in the Pauli string.
-        num_ops  = len(op_string_B.orbital_operators)//2
+        num_ops = len(op_string_B.orbital_operators)
         if num_ops % 2 == 1:
             coeffB *= -1.0
             
@@ -276,10 +227,64 @@ def _particle_hole_rule(op_string_A, info):
     return Operator([coeffB], [op_string_B])
 
 def label_permutation(permutation):
-    return Transformat(_permutation_rule, permutation)
+    return Transformation(_permutation_rule, permutation)
 
 def time_reversal(sign=1.0):
     return Transformation(_time_reversal_rule, sign)
 
 def particle_hole(sign=1.0):
     return Transformation(_particle_hole_rule, sign)
+
+def symmetry_matrix(transformation, basis, tol=1e-12):
+    """Create the symmetry matrix that represents the
+    effect of the transformation on the basis of 
+    OperatorStrings.
+
+    For a unitary (or antiunitary) transformation
+    operator U and a basis of operator strings h_a,
+    the symmetry matrix M is defined through
+        U h_a U^{-1} = \sum_b M_{ba} h_b
+
+    Parameters
+    ----------
+    transformation : Transformation
+        The Transformation to perform 
+        on the OperatorStrings.
+    basis : Basis
+        The Basis of OperatorStrings used to
+        represent the symmetry matrix.
+    
+    Returns
+    -------
+    scipy.sparse.csc_matrix of complex
+        A sparse, not-necessarily-unitary complex matrix.
+    """
+
+    dim_basis = len(basis)
+
+    row_inds = []
+    col_inds = []
+    data     = []
+    for indA in range(dim_basis):
+        op_string_A = basis[indA]
+
+        operatorB = transformation.apply(op_string_A)
+        
+        for (coeff_B, op_string_B) in operatorB:
+            
+            # Ignore operators not currently in the basis.
+            # If there are operators outside of the basis, this
+            # will make the symmetry matrix non-unitary.
+            if op_string_B not in basis:
+                continue
+            
+            indB = basis.index(op_string_B)
+
+            if np.abs(coeff_B) > tol:
+                row_inds.append(indB)
+                col_inds.append(indA)
+                data.append(coeff_B)
+
+    symmetry_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(dim_basis, dim_basis))
+            
+    return symmetry_matrix

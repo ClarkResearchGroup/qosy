@@ -1,5 +1,5 @@
 from .context import qosy as qy
-from helper import _random_op_string
+from .helper import _random_op_string
 import numpy as np
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
