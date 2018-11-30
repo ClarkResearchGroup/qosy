@@ -4,13 +4,13 @@ import numpy as np
 import numpy.linalg as nla
 import scipy.sparse.linalg as ssla
 
-import algebra
-import transformation
+from .algebra import commutant_matrix
+from .transformation import symmetry_matrix
 
 def commuting_operators(basis, operator, operation_mode='commutator', num_vecs=None, return_com_matrix=False, _sigma=None, _tol=1e-10):
-    commutant_matrix = algebra.commutant_matrix(basis, operator, operation_mode=operation_mode)
+    com_matrix = commutant_matrix(basis, operator, operation_mode=operation_mode)
 
-    CDagC = (commutant_matrix.H).dot(commutant_matrix)
+    CDagC = (com_matrix.H).dot(com_matrix)
 
     if num_vecs is None:
         (evals, evecs) = nla.eigh(CDagC.toarray())
@@ -27,12 +27,12 @@ def commuting_operators(basis, operator, operation_mode='commutator', num_vecs=N
         warnings.warn('All {} vectors found with eigsh were in the null space. Increase num_vecs to ensure that you are not missing null vectors.'.format(num_vecs))
 
     if return_com_matrix:
-        return (null_space, commutant_matrix)
+        return (null_space, com_matrix)
     else:
         return null_space
 
 def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=None, return_sym_matrix=False, _tol=1e-10):
-    symmetry_matrix = transformation.symmetry_matrix(basis, transform)
+    sym_matrix = symmetry_matrix(basis, transform)
     
     if operation_mode in ['commute', 'Commute', 'symmetry', 'commutator']:
         sign = 1.0
@@ -41,7 +41,7 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
     else:
         raise ValueError('Unknown operation_mode: {}'.format(operation_mode))
 
-    matrix = 0.5*(symmetry_matrix + symmetry_matrix.H)
+    matrix = 0.5*(sym_matrix + sym_matrix.H)
 
     if num_vecs is None:
         (evals, evecs) = nla.eigh(matrix.toarray())
@@ -55,6 +55,6 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
         warnings.warn('All {} vectors found with eigsh were in the ({})-eigenvalue subspace. Increase num_vecs to ensure that you are not missing null vectors.'.format(num_vecs, sign))
 
     if return_sym_matrix:
-        return (vecs, symmetry_matrix)
+        return (vecs, sym_matrix)
     else:
         return vecs

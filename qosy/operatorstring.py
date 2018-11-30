@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 import numpy as np
 import itertools as it
-#import lattice
-
-import tools
 from .config import *
 
 class OperatorString:

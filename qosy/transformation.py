@@ -2,7 +2,7 @@
 import numpy as np
 import scipy.sparse as ss
 
-import tools
+from .tools import sort_sign
 from .operatorstring import OperatorString
 from .basis import Operator
 
@@ -30,17 +30,24 @@ class Transformation:
         self.info = info
 
     def apply(self, operator, tol=1e-12):
-        """Apply the transformation U to an operator string h_a.
+        """Apply the transformation U to an 
+        operator string h_a or operator 
+        O=\sum_a J_a h_a.
 
         Parameters
         ----------
         operator : OperatorString or Operator
-            The operator to apply the transformation to.
+            The OperatorString or Operator to 
+            apply the transformation to.
 
         Returns
         -------
         Operator
-            The transformed operator U h_a U^{-1}.
+            The transformed operator string 
+                U h_a U^{-1}
+            or operator
+                \sum_a J_a U h_a U^{-1}
+            (assumes J_a are real).
         """
         
         if isinstance(operator, OperatorString):
@@ -116,7 +123,7 @@ def _permutation_rule(op_string_A, info):
         
         # Make sure to compute the sign acquired from reordering
         # A and B operators in the Majorana strings.
-        (_, sign) = tools.sort_sign(inds_ab_sorted)
+        (_, sign) = sort_sign(inds_ab_sorted)
         
         # Also, account for the prefactors in front of the Majorana
         # string operators before and after the transformation.

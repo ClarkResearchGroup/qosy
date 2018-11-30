@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
 
-import tools
+from .tools import sort_sign, compare
 from .config import *
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
@@ -92,7 +92,7 @@ def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
         if len(fermion_labels) == 0 and not include_identity:
             continue
         
-        (sorted_fermion_labels, sign) = tools.sort_sign(fermion_labels)
+        (sorted_fermion_labels, sign) = sort_sign(fermion_labels)
         coeff *= sign
         
         # The i_1,\ldots,i_m labels
@@ -101,7 +101,7 @@ def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
         c_labels    = large_number - sorted_fermion_labels[num_cdags:]
         c_labels    = c_labels[::-1]
         
-        lex_order = tools.compare(cdag_labels, c_labels)
+        lex_order = compare(cdag_labels, c_labels)
         
         # Resulting operator is not lexicographically sorted. Ignore it.
         if lex_order < 0:
@@ -148,7 +148,7 @@ def _convert_fermion_string(op_string, include_identity=False, tol=1e-12):
     # Majorana operator labels are in the correct order. Keep track of the
     # sign due to reordering when you do this.
     fermion_labels = cdag_labels + c_labels[::-1]
-    (sorted_fermion_labels, sign) = tools.sort_sign(fermion_labels)
+    (sorted_fermion_labels, sign) = sort_sign(fermion_labels)
 
     # Collect the information about the CDag, C, CDagC fermion operators and their labels into
     # the ops = [(orbital operator, orbital operator label), ...] list, which has the operators ordered correctly.

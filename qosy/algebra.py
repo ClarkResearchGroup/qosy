@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 import numpy as np
 import scipy.sparse as ss
-import tools
 
+from .tools import sort_sign
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
-from .tools import sort_sign
 
 def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12):
     op_type = op_string_A.op_type
@@ -30,8 +29,8 @@ def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12)
         labels_ab_A_times_B = np.concatenate((op_string_A._labels_ab_operators, op_string_B._labels_ab_operators))
         labels_ab_B_times_A = np.concatenate((op_string_B._labels_ab_operators, op_string_A._labels_ab_operators))
         
-        (_, sign1) = tools.sort_sign(labels_ab_A_times_B)
-        (_, sign2) = tools.sort_sign(labels_ab_B_times_A)
+        (_, sign1) = sort_sign(labels_ab_A_times_B)
+        (_, sign2) = sort_sign(labels_ab_B_times_A)
 
         coeff1 *= sign1
         coeff2 *= sign2
