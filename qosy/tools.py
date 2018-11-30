@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 
+
 def sort_sign(vector, tol=1e-10):
     """Stable sorts the vector and returns
     the sign of the permutation needed to sort it.
@@ -35,30 +36,13 @@ def sort_sign(vector, tol=1e-10):
     else:
         return (vec, 1)
 
-def argsort(my_list):
-    """Finds the permutation of the indices
-    that sorts the list.
-
-    Parameter
-    ---------
-    my_list : list
-        The list to sort.
-
-    Returns
-    -------
-    list of int
-        The permutation that sorts the list.
-    """
-
-    return sorted(range(len(my_list)), key=my_list.__getitem__)
-
 def compare(labelsI, labelsJ):
-    """Lexicographically compares two sets of labels, (i_1,\ldots,i_m) 
-    and (j_1,\ldots,j_l). 
+    """Lexicographically compares two sets of labels, :math:`(i_1,\ldots,i_m)` 
+    and :math:`(j_1,\ldots,j_l)`. 
 
-    If m < l, then (i_1,\ldots,i_m) < (j_1,\ldots,j_l). 
-    If m = l, then you compare i_1 and j_1. If those are equal, you 
-    compare i_2 and j_2, and so on.
+    If :math:`m < l`, then :math:`(i_1,\ldots,i_m) < (j_1,\ldots,j_l)`. 
+    If :math:`m = l`, then you compare :math:`i_1` and :math:`j_1`. 
+    If those are equal, you compare :math:`i_2` and :math:`j_2`, and so on.
 
     Parameters
     ----------

@@ -13,18 +13,18 @@ class Basis:
     Attributes
     ----------
     op_strings : list of OperatorStrings
-        The list of OperatorStrings to store in the basis.
+        The list of OperatorStrings to store in the Basis.
     """
     
     def __init__(self, op_strings=None):
         """Construct an object that represents an ordered 
-        basis of operator strings.
+        Basis of OperatorStrings.
         
         Parameters
         ----------
         op_strings : list of OperatorStrings, optional
-            The basis is created from this list of operator strings.
-            If None are specified, then creates an empty basis by
+            The Basis is created from this list of OperatorStrings.
+            If None are specified, then creates an empty Basis by
             default.
 
         """
@@ -46,27 +46,32 @@ class Basis:
             raise ValueError('Tried to create a basis with multiple copies of the same operator string. There were {} operator strings, but only {} uniques ones.'.format(len(self.op_strings),len(self._indices)))
 
     def index(self, op_string):
-        """Return the index of the operator string in the basis.
+        """Return the index of the OperatorString in the Basis.
 
         Parameters
         ----------
         op_string : OperatorString
-             The operator string to find in the basis.
+             The OperatorString to find in the Basis.
 
         Returns
         -------
         int
-             The index of the OperatorString in the basis.
+             The index of the OperatorString in the Basis.
         """
         return self._indices[op_string]
 
     def __iter__(self):
-        """Return an iterator over the OperatorStrings in the basis in order.
+        """Return an iterator over the OperatorStrings in the Basis in order.
 
         Returns
         -------
         iterator of OperatorStrings
-            An iterator over the OperatorStrings in the basis in order.
+            An iterator over the OperatorStrings in the Basis in order.
+
+        Examples
+        --------
+            >>> for op_string in basis:
+            >>>     print(op_string)
         """
         
         return iter(self.op_strings)
@@ -87,7 +92,7 @@ class Basis:
         Examples
         --------
         To get the last element of a basis:
-        >>> op_string = basis[-1]
+            >>> op_string = basis[-1]
         """
         
         return self.op_strings[index]
@@ -99,6 +104,10 @@ class Basis:
         -------
         int
             The size of the basis.
+
+        Examples
+        --------
+            >>> dim_basis = len(basis)
         """
         return len(self.op_strings)
 
@@ -108,6 +117,10 @@ class Basis:
         Returns
         -------
         str
+
+        Examples
+        --------
+            >>> print(basis) # Prints a string representation of the basis
         """
 
         list_strings = []
@@ -128,6 +141,13 @@ class Basis:
         Returns
         -------
         bool
+
+        Examples
+        --------
+        To check if the identity operator is in a basis
+        of Pauli strings
+            >>> identity = qosy.opstring('I', 'Pauli')
+            >>> print(identity in basis)
         """
         
         return item in self._indices
@@ -150,8 +170,8 @@ class Basis:
 
         Examples
         --------
-        You can combine two bases simply with
-        >>> combined_basis = basis1 + basis2
+        You can combine two bases together with
+            >>> combined_basis = basis1 + basis2
         """
         
         if isinstance(other, Basis):
@@ -164,25 +184,25 @@ class Basis:
         return Basis(self.op_strings + new_op_strings)
 
     def __iadd__(self, other):
-        """Adds an operator string or a basis of operator strings
-        in-place to the basis.
+        """Add an OperatorString or Basis of OperatorStrings
+        in-place to the Basis.
 
         Parameters
         ----------
         other : OperatorString or Basis
-            The operator string or basis of operator strings to add
-            to the current basis. Any repeated OperatorStrings will not
-            be double-counted.
+            The OperatorString or Basis of OperatorStrings to add
+            to the current Basis. Any repeated OperatorStrings will 
+            not be double-counted.
 
         Examples
         --------
         To incrementally grow a basis, you can initialize
         an empty basis and add elements as follows:
-        >>> basis1 = Basis()
-        >>> basis1 += opstring('X 1 X 2')
-        >>> basis1 += opstring('Y 1 Z 3')
-        >>> basis2 = Basis()
-        >>> basis2 += basis1
+            >>> basis1 = qosy.Basis()
+            >>> basis1 += qosy.opstring('X 1 X 2')
+            >>> basis1 += qosy.opstring('Y 1 Z 3')
+            >>> basis2 = qosy.Basis()
+            >>> basis2 += basis1
         """
         
         if isinstance(other, Basis):
@@ -203,9 +223,53 @@ class Basis:
         return self
 
     def __eq__(self, other):
+        """Check if two Bases are equal.
+
+        Parameters
+        ----------
+        other : Basis
+            Basis to compare against.
+        
+        Returns
+        -------
+        bool
+            True if they are equal and False otherwise.
+            Order of OperatorStrings matters for equality.
+        """
+        
         return self.op_strings == other.op_strings and self._indices == other._indices
 
 class Operator:
+    """An Operator object represents a quantum operator
+    :math:`\hat{O}=\sum_a J_a \hat{h}_a` that is a linear
+    combination of OperatorStrings :math:`\hat{h}_a`.
+        
+    Attributes
+    ----------
+    coeffs : list or ndarray of complex
+        The coefficients :math:`J_a` in front of the 
+        OperatorStrings :math:`\hat{h}_a`. If all 
+        coefficients are real, then the operator
+        is Hermitian.
+    op_strings : list of OperatorStrings
+        The OperatorStrings :math:`\hat{h}_a` that 
+        make up this operator.
+    op_type : str
+        The type of OperatorStrings that make up the 
+        operator: 'Pauli', 'Majorana', or 'Fermion'.
+        Deduced from op_strings if non-empty.
+
+    Examples
+    --------
+    To construct a zero operator to use with Pauli strings:
+        >>> zero_op = qosy.Operator(op_type='Pauli')
+    To construct a Heisenberg bond between orbitals 1 and 2:
+        >>> xx = qosy.opstring('X 1 X 2')
+        >>> yy = qosy.opstring('Y 1 Y 2')
+        >>> zz = qosy.opstring('Z 1 Z 2')
+        >>> bond = qosy.Operator(0.25*numpy.ones(3), [xx,yy,zz])
+    """
+    
     def __init__(self, coeffs=None, op_strings=None, op_type=None):
         """Construct an object that represents a quantum operator.
         It is a linear combination of operator strings.
@@ -227,7 +291,7 @@ class Operator:
         --------
         To construct a zero operator to use with Pauli strings:
         >>> zero_op = qosy.Operator(op_type='Pauli')
-        To construct a Heisenberg bond between sites 1 and 2:
+        To construct a Heisenberg bond between orbitals 1 and 2:
         >>> xx = qosy.opstring('X 1 X 2')
         >>> yy = qosy.opstring('Y 1 Y 2')
         >>> zz = qosy.opstring('Z 1 Z 2')
@@ -251,6 +315,20 @@ class Operator:
             raise ValueError('Cannot create an empty (zero) operator without specifying the op_type.')
 
     def remove_zeros(self, tol=1e-12):
+        """Remove OperatorStrings with zero coefficients
+        from the Operator.
+
+        Returns
+        -------
+        Operator
+            A new Operator with the zero-coefficient 
+            OperatorStrings removed.
+
+        Examples
+        --------
+            >>> cleaned_operator = operator.remove_zeros()
+        """
+        
         inds_nonzero = np.where(np.abs(self.coeffs) > tol)[0]
 
         # The non-zero coefficients.
@@ -266,6 +344,25 @@ class Operator:
         return new_operator
 
     def norm(self):
+        """Compute the Hilbert-Schmidt norm of the Operator. 
+
+        For an Operator :math:`\hat{O}=\sum_a J_a \hat{h}_a`  
+        made of orthonormal OperatorStrings :math:`\hat{h}_a` 
+        that satisfy :math:`\\langle \hat{h}_a, \hat{h}_b\\rangle = \\textrm{tr}(\hat{h}_a^\dagger \hat{h}_b)=\delta_{ab}`,
+        the (squared) Hilbert-Schmidt norm is
+            :math:`||\hat{O}||^2 = \sum_a J_a^2`
+        which is just the :math:`\ell_2`-norm of the :math:`J_a`
+        vector.
+
+        Returns
+        -------
+        float
+            The 
+        """
+        
+        if len(self._basis) > 0 and self._basis[0].op_type == 'Fermion':
+            raise NotImplementedError('Computing the normalization of Operators made of Fermion strings is not supported yet. Fermion strings do not form an orthonormal basis, so one would need to compute an overlap matrix.')
+        
         return np.linalg.norm(self.coeffs)
 
     def normalize(self):

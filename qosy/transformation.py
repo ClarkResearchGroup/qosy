@@ -7,6 +7,24 @@ from .operatorstring import OperatorString
 from .basis import Operator
 
 class Transformation:
+    """A Transformation object represents a 
+    symmetry transformation that acts on the 
+    Hilbert space of states.
+
+    Attributes
+    ----------
+    rule : Operator = function(OperatorString, info_type)
+        The transformation rule is a 
+        user-supplied function that takes in
+        an OperatorString and additional info
+        and returns an Operator representing
+        the effect of the transformation on 
+        the OperatorString.
+    info : info_type
+        The information provided to the
+        transformation rule function.
+    """
+    
     def __init__(self, rule, info):
         """Construct a Transformation object that 
         represents a symmetry transformation that
@@ -30,9 +48,9 @@ class Transformation:
         self.info = info
 
     def apply(self, operator, tol=1e-12):
-        """Apply the transformation U to an 
-        operator string h_a or operator 
-        O=\sum_a J_a h_a.
+        """Apply the transformation :math:`\hat{\mathcal{U}}` to an 
+        operator string :math:`\hat{h}_a` or operator 
+        :math:`\hat{O}=\sum_a J_a \hat{h}_a`.
 
         Parameters
         ----------
@@ -44,10 +62,10 @@ class Transformation:
         -------
         Operator
             The transformed operator string 
-                U h_a U^{-1}
+                :math:`\hat{\mathcal{U}} \hat{h}_a \hat{\mathcal{U}}^{-1}`
             or operator
-                \sum_a J_a U h_a U^{-1}
-            (assumes J_a are real).
+                :math:`\sum_a J_a \hat{\mathcal{U}} \hat{h}_a \hat{\mathcal{U}}^{-1}`
+            (assumes :math:`J_a` are real).
         """
         
         if isinstance(operator, OperatorString):
@@ -66,7 +84,7 @@ class Transformation:
     def _product_rule(op_string_A, info, tol=1e-12):
         # Transformation rule for an operator 
         # that is a product of two operators: U = D*C.
-        # U h_a U^{-1} = D C h_a C^{-1} D^{-1}
+        # U \hat{h}_a U^{-1} = D C \hat{h}_a C^{-1} D^{-1}
         
         # The information contains the rules for the C and D operators.
         (ruleC, infoC, ruleD, infoD) = info
@@ -87,6 +105,27 @@ class Transformation:
         return result
 
     def __mul__(self, other):
+        """Take the product of two Transformations :math:`\hat{\mathcal{C}}` and :math:`\hat{\mathcal{D}}`.
+        
+        Parameters
+        ----------
+        other : Transformation
+            The transformation :math:`\hat{\mathcal{D}}` to multiply on the right of :math:`\hat{\mathcal{C}}`.
+
+        Returns
+        -------
+        Transformation
+            The resulting Transformation :math:`\hat{\mathcal{C}}\hat{\mathcal{D}}`.
+
+        Examples
+        --------
+        We can define the chiral symmetry transformation
+        as a product of time-reversal and charge-conjugation
+            >>> T = qosy.time_reversal()
+            >>> C = qosy.charge_conjugation()
+            >>> S = T * C # chiral symmetry transformation
+        """
+        
         product_info = (other.rule, other.info, self.rule, self.info)
         return Transformation(Transformation._product_rule, product_info)      
 
@@ -103,7 +142,7 @@ def _permutation_rule(op_string_A, info):
         raise ValueError('Invalid op_type: {}'.format(op_string_A.op_type))
 
     # The information is a permutation that specifies how labels map into other labels.
-    permutation = info
+    permutation = np.array(info, dtype=int)
     
     coeffB = 1.0
     
@@ -234,13 +273,110 @@ def _particle_hole_rule(op_string_A, info):
     return Operator([coeffB], [op_string_B])
 
 def label_permutation(permutation):
+    """Create a Transformation that permutes
+    the orbital labels of OperatorStrings.
+
+    The transformation acts on operator strings
+    as
+       :math:`\hat{h}_a = \hat{O}_{l_1} \cdots \hat{O}_{l_n} \\rightarrow \hat{h}_b = \hat{O}_{\pi(l_1)} \cdots \hat{O}_{\pi(l_n)}`
+    where :math:`\pi` is a permutation.
+
+    Parameters
+    ----------
+    permutation : ndarray or list of int
+        The permutation of integer orbital labels.
+
+    Returns
+    -------
+    Transformation
+        The Transformation that implements the
+        orbital relabelling.
+
+    Examples
+    --------
+    Consider a chain of four equally spaced
+    orbitals labeled `0,1,2,3`. A reflection
+    about the center of the chain can be 
+    created with
+        >>> R = qosy.label_permutation([3,2,1,0])
+    If the chain is periodic, then a 
+    translation to the right can be made with
+        >>> P = qosy.label_permutation([1,2,3,0])
+    """
     return Transformation(_permutation_rule, permutation)
 
 def time_reversal(sign=1.0):
+    """Create a (spin-less) time-reversal 
+    Transformation :math:`\hat{\mathcal{T}}`.
+    
+    The most important aspect of time reversal
+    is that it is antiunitary and acts as a 
+    complex conjugation operator:
+       :math:`\hat{\mathcal{T}} i \hat{\mathcal{T}}^{-1} = -i \quad (i \\rightarrow -i)`
+    
+    The transformation acts on (spin-less)
+    Fermionic operators as
+        :math:`c_j \\rightarrow \pm c_j, \quad c_j^\dagger \\rightarrow  \pm c_j^\dagger`
+    and Majorana operators as
+        :math:`a_j \\rightarrow \pm a_j, \quad b_j \\rightarrow \mp b_j, \quad d_j \\rightarrow d_j`
+
+    On spin operators, the transformation acts as:
+        :math:`\sigma^a_j \\rightarrow -\sigma^a_j \quad (\hat{\mathcal{T}} \sigma^a_j \hat{\mathcal{T}}^{-1} = -\sigma^a_j)`
+
+    Parameters
+    ----------
+    sign : 1.0 or -1.0, optional
+        Specifies whether :math:`\hat{\mathcal{T}}^2 = 1` or :math:`\hat{\mathcal{T}}^2 = (-1)^\hat{N}`.
+        Defaults to 1.0.
+
+    Returns
+    -------
+    Transformation
+        The Transformation that implements
+        time-reversal.
+
+    Examples
+    --------
+    >>> T = qosy.time_reversal()
+    """
+    
     return Transformation(_time_reversal_rule, sign)
 
 def particle_hole(sign=1.0):
+    """Create a particle-hole (or charge-conjugation) 
+    Transformation :math:`\hat{\mathcal{C}}`.
+    
+    The transformation acts on (spin-less)
+    Fermionic operators as
+        :math:`c_j \\rightarrow \pm c_j^\dagger, \quad c_j^\dagger \\rightarrow \pm c_j`
+    and Majorana operators as
+        :math:`a_j \\rightarrow \pm a_j, \quad b_j \\rightarrow \mp b_j, \quad d_j \\rightarrow - d_j`
+
+    Parameters
+    ----------
+    sign : 1.0 or -1.0, optional
+        Specifies whether :math:`\hat{\mathcal{C}}^2 = 1` 
+        or :math:`\hat{\mathcal{C}}^2 = (-1)^\hat{N}`.
+        Defaults to 1.0.
+
+    Returns
+    -------
+    Transformation
+        The Transformation that implements
+        charge-conjugation.
+
+    Examples
+    --------
+    >>> C = qosy.particle_hole()
+    """
+    
     return Transformation(_particle_hole_rule, sign)
+
+def charge_conjugation(sign=1.0):
+    """Same as particle_hole(sign).
+    """
+    
+    return particle_hole(sign)
 
 def symmetry_matrix(transformation, basis, tol=1e-12):
     """Create the symmetry matrix that represents the
@@ -248,9 +384,10 @@ def symmetry_matrix(transformation, basis, tol=1e-12):
     OperatorStrings.
 
     For a unitary (or antiunitary) transformation
-    operator U and a basis of operator strings h_a,
-    the symmetry matrix M is defined through
-        U h_a U^{-1} = \sum_b M_{ba} h_b
+    operator :math:`\hat{\mathcal{U}}` and a basis 
+    of operator strings :math:`\hat{h}_a`,
+    the symmetry matrix :math:`M` is defined through
+        :math:`\hat{\mathcal{U}} \hat{h}_a \hat{\mathcal{U}}^{-1} = \sum_b M_{ba} \hat{h}_b`
 
     Parameters
     ----------
