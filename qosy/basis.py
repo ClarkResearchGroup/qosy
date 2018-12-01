@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import warnings
 import numpy as np
 import itertools as it
 import copy
@@ -348,7 +349,7 @@ class Operator:
 
         For an Operator :math:`\hat{O}=\sum_a J_a \hat{h}_a`  
         made of orthonormal OperatorStrings :math:`\hat{h}_a` 
-        that satisfy :math:`\\langle \hat{h}_a, \hat{h}_b\\rangle = \\textrm{tr}(\hat{h}_a^\dagger \hat{h}_b)=\delta_{ab}`,
+        that satisfy :math:`\\langle \hat{h}_a, \hat{h}_b\\rangle = \\textrm{tr}(\hat{h}_a^\dagger \hat{h}_b)/\\textrm{tr}(\hat{I}) =\delta_{ab}`,
         the (squared) Hilbert-Schmidt norm is
             :math:`||\hat{O}||^2 = \sum_a J_a^2`
         which is just the :math:`\ell_2`-norm of the :math:`J_a`
@@ -357,18 +358,51 @@ class Operator:
         Returns
         -------
         float
-            The 
+            The Hilbert-Schmidt norm of the Operator.
+
+        Examples
+        --------
+        >>> operator = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> operator.norm() # sqrt(2) = 1.414213
         """
-        
+
         if len(self._basis) > 0 and self._basis[0].op_type == 'Fermion':
-            raise NotImplementedError('Computing the normalization of Operators made of Fermion strings is not supported yet. Fermion strings do not form an orthonormal basis, so one would need to compute an overlap matrix.')
+            warnings.warn('Computing the normalization of Operators made of Fermion strings is not supported yet. Fermion strings do not form an orthonormal basis, so one would need to compute an overlap matrix. The norm is only reliable for zero operators.')
         
         return np.linalg.norm(self.coeffs)
 
     def normalize(self):
+        """Normalize the Operator to have unit norm.
+
+        Examples
+        --------
+        >>> operator = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> operator.normalize()
+        >>> operator.norm() # 1.0
+        """
+        
         self.coeffs /= self.norm()
 
     def __add__(self, other):
+        """Add an Operator to this Operator.
+
+        Parameters
+        ----------
+        other : Operator
+            The Operator to add to this one.
+
+        Returns
+        -------
+        Operator
+            The sum of the two Operators.
+
+        Examples
+        --------
+        >>> operator1 = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> operator2 = qosy.Operator([1.0], [qosy.opstring('Z 1')])
+        >>> operator1 + operator2 # X_1 + Y_1 + Z_1
+        """
+        
         if self.op_type != other.op_type:
             raise ValueError('Cannot add operator of op_type {} to operator of op_type {}'.format(self.op_type, other.op_type))
 
@@ -394,6 +428,20 @@ class Operator:
         return new_operator
 
     def __iadd__(self, other):
+        """Add an Operator in-place to this Operator.
+
+        Parameters
+        ----------
+        other : Operator
+            The Operator to add to this one.
+
+        Examples
+        --------
+        >>> operator1 = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> operator2 = qosy.Operator([1.0], [qosy.opstring('Z 1')])
+        >>> operator1 += operator2 # X_1 + Y_1 + Z_1
+        """
+        
         if self.op_type != other.op_type:
             raise ValueError('Cannot add operator of op_type {} to operator of op_type {}'.format(self.op_type, other.op_type))
 
@@ -417,24 +465,139 @@ class Operator:
         return self
 
     def __mul__(self, other):
+        """Compute the product of this Operator and a number.
+
+        Parameters
+        ----------
+        other : float or complex
+            The number to multiply the Operator.
+
+        Returns
+        -------
+        Operator
+            The Operator with its coefficient's 
+            multipled by the number
+
+        Examples
+        --------
+        >>> operator = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> operator * 2.0 # 2 (X_1 + Y_1)
+        """
+        
         return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
 
     def __rmul__(self, other):
+        """Compute the product of this Operator and a number.
+
+        Parameters
+        ----------
+        other : float or complex
+            The number to multiply the Operator.
+
+        Returns
+        -------
+        Operator
+            The Operator with its coefficient's 
+            multipled by the number
+
+        Examples
+        --------
+        >>> operator = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> 2 * operator # 2 (X_1 + Y_1)
+        """
+        
         return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
     
     def __sub__(self, other):
+        """Subtract an Operator from this Operator.
+
+        Parameters
+        ----------
+        other : Operator
+            The Operator to subtract from this one.
+
+        Returns
+        -------
+        Operator
+            The difference of the two Operators.
+
+        Examples
+        --------
+        >>> operator1 = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> operator2 = qosy.Operator([1.0], [qosy.opstring('Z 1')])
+        >>> operator1 - operator2 # X_1 + Y_1 - Z_1
+        """
+        
         return self.__add__(-1.0*other)
 
     def __isub__(self, other):
+        """Subtract an Operator in-place from this Operator.
+
+        Parameters
+        ----------
+        other : Operator
+            The Operator to subtract from this one.
+
+        Examples
+        --------
+        >>> operator1 = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+        >>> operator2 = qosy.Operator([1.0], [qosy.opstring('Z 1')])
+        >>> operator1 -= operator2 # X_1 + Y_1 - Z_1
+        """
+        
         return self.__iadd__(-1.0*other)
 
     def __iter__(self):
+        """Return an iterator over the (coefficient, OperatorString)
+        pairs of the Operator.
+
+        Returns
+        -------
+        iterator of (number, OperatorString)
+        
+        Examples
+        --------
+            >>> operator = qosy.Operator([1.0, -1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+            >>> positive_ops = [op_string for (coeff, op_string) in operator if coeff > 0.0] # [X_1]
+        """
+        
         return iter(zip(self.coeffs, self._basis.op_strings))
     
     def __len__(self):
+        """Return the number of OperatorStrings that make up
+        the Operator.
+
+        Returns
+        -------
+        int
+            The number of OperatorStrings making up the Operator.
+
+        Examples
+        --------
+            >>> operator = qosy.Operator([1.0, -1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+            >>> len(operator) # 2
+        Note that zero-coefficient OperatorStrings are still counted:
+            >>> operator = qosy.Operator([1.0, 0.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+            >>> len(operator) # 2
+        """
+        
         return len(self._basis)
     
     def __str__(self):
+        """Return the python string representation of the Operator
+        in human-readable form.
+
+        Returns
+        -------
+        str
+            The string repesentation of the Operator.
+
+        Examples
+        --------
+            >>> operator = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+            >>> print(operator)
+        """
+        
         list_strings = []
         for ind_coeff in range(len(self.coeffs)):
             coeff = self.coeffs[ind_coeff]
@@ -445,6 +608,36 @@ class Operator:
         return result
 
     def __eq__(self, other):
+        """Checks if an Operator is equivalent to this one.
+
+        Parameters
+        ----------
+        other : Operator
+            The Operator to compare against.
+
+        Returns
+        -------
+        bool
+            True if equal, False otherwise. Note that
+            the order of OperatorStrings matters.
+
+        Examples
+        --------
+            >>> operator1 = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
+            >>> operator2 = qosy.Operator([1.0, 1.0], [qosy.opstring('Y 1'), qosy.opstring('X 1')])
+            >>> operator1 == operator2 # False
+        
+        Notes
+        -----
+        There is an alternative less-strict way to check 
+        equality betweeen two Operators. This alternative 
+        approach checks if they are made of the same linear
+        combination of OperatorStrings by taking their 
+        difference:
+         
+            >>> (operator1 - operator2).norm() < 1e-12 # True
+        """
+        
         return self.op_type == other.op_type and (len(self.coeffs) == len(other.coeffs)) and (self.coeffs == other.coeffs).all() and self._basis == other._basis
     
 def cluster_basis(k, cluster_labels, op_type, include_identity=False):

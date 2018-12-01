@@ -188,15 +188,15 @@ def test_structure_constants_simple():
                          qy.OperatorString(['Y', 'X'], [1, 2], 'Pauli')
                         ]
     
-    basis_A = qy.Basis(op_strings_basisA)
-    basis_B = qy.Basis(op_strings_basisB)
-    expected_basis_C = qy.Basis(op_strings_expected_basisC)
+    basisA = qy.Basis(op_strings_basisA)
+    basisB = qy.Basis(op_strings_basisB)
+    expected_basisC = qy.Basis(op_strings_expected_basisC)
 
     expected_structure_constants = np.array([[0,-2j,0],[0,0,2j]],dtype=complex)
     
-    (structure_constants_list, basis_C) = qy.algebra.structure_constants(basis_A, basis_B)
+    (structure_constants_list, basisC) = qy.algebra.structure_constants(basisA, basisB, return_extended_basis=True)
 
     assert(np.allclose(structure_constants_list[0].todense(), expected_structure_constants))
 
-    assert(set(basis_C.op_strings) == set(expected_basis_C.op_strings))
+    assert(set(basisC.op_strings) == set(expected_basisC.op_strings))
 

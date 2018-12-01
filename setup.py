@@ -2,7 +2,7 @@
 
 from distutils.core import setup
 
-setup(name='Qosy',
+setup(name='qosy',
       version='1.0',
       description='Quantum Operators from SYmmetries',
       author='Eli Chertkov',
