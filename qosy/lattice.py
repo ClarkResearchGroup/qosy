@@ -1,151 +1,190 @@
 #!/usr/bin/env python
+import itertools as it
 import numpy as np
 import matplotlib.pyplot as plt
-
+from mpl_toolkits.mplot3d import Axes3D
+                
 class UnitCell:
-    def __init__(self, labels, positions=None, lattice_vectors=None):
-        """Construct a UnitCell object that represents a unit 
-        cell of orbitals that can tile a lattice.
-        
-        Parameters
-        ----------
-        labels : array_like of hashable items, (N,)
-            The labels of the N orbitals in the unit cell.
-        positions : numpy array, (N,d), optional
-            The d-dimensional coordinates of the N orbitals 
-            in real space. Defaults to equally spaced positions 
-            in d=1 dimension.
-        lattice_vectors : numpy array, (d,d), optional
-            Array whose columns are the bravais lattice vectors 
-            that define the size of the unit cell. Defaults to 
-            a d x d identity matrix.
-
-        """
-        self.labels          = labels
-        self.positions       = positions
+    def __init__(self, lattice_vectors, atom_positions=None, atom_orbitals=None):
         self.lattice_vectors = lattice_vectors
 
-        if self.positions is None:
-            self.positions = np.zeros((len(self.labels),1))
-            self.positions[:,0] = np.arange(len(self.labels))
-        if self.lattice_vectors is None:
-            self.lattice_vectors = np.eye(int(self.positions.shape[1]))
+        if atom_positions is None:
+            self.atom_positions = []
+        else:
+            self.atom_positions = atom_positions
+            
+        if atom_orbitals is None:
+            self.atom_orbitals = []
+        else:
+            self.atom_orbitals = atom_orbitals
+
+    def add_atom(self, position, orbitals=None):
+        self.atom_positions.append(position)
         
+        if orbitals is None:
+            self.atom_orbitals.append([''])
+        else:
+            self.atom_orbitals.append(orbitals)
+
 class Lattice:
-    """A Lattice object represents a lattice tiled 
-    by translated copies of a d-dimensional unit cell.
+    """A Lattice object represents a lattice of orbitals 
+    attached to atoms that is tiled by translated copies 
+    of a d-dimensional unit cell.
         
     Attributes
     ----------
-    unit_cell : UnitCell object
-        The unit cell that tiles the lattice.
-    num_cells : tuple of int, (d,)
+    unit_cell : UnitCell
+        The UnitCell of atoms that tiles the Lattice.
+    num_cells : list, array, or tuple of int, (d,)
         The number of unit cells to tile in each of 
         the d directions of the lattice vectors.
-        Defaults to all 1.
-    boundary : tuple of str, (d,)
-        The boundary conditions ('Open' or 'Periodic') 
-        in each of the d directions of the lattice vectors. 
-        Defaults to all 'Open'.
-    labels : array_like of hashable items, (N,)
-        The labels of the N orbitals in the lattice.
-    positions : numpy array, (d,N)
-        The d-dimensional position vectors of the N orbitals.
+    periodic_boundaries : list, array, or tuple of bool, (d,)
+        The boundary conditions in each of the d lattice vector
+        directions. True means periodic, False means open.
+    dim : int
+        The dimension d of the Lattice.
     """
     
-    def __init__(self, unit_cell, num_cells=None, boundary=None):
-        """Construct a Lattice object that represents a lattice tiled 
-        by translated copies of a unit cell.
-        
-        Parameters
-        ----------
-        unit_cell : UnitCell object
-            The unit cell that tiles the lattice.
-        num_cells : tuple of int, (d,), optional
-            The number of unit cells to tile in each of 
-            the d directions of the lattice vectors.
-            Defaults to all 1.
-        boundary : tuple of str, (d,), optional
-            The boundary conditions ('Open' or 'Periodic') 
-            in each of the d directions of the lattice vectors. 
-            Defaults to all 'Open'.
-        """
-        
+    def __init__(self, unit_cell, num_cells, periodic_boundaries=None):
         self.unit_cell = unit_cell
         self.num_cells = num_cells
-        self.boundary  = boundary
 
-        if self.num_cells is None:
-            self.num_cells = tuple([1]*len(num_cells))
+        # A list of tuples of the positions, orbital names, and unit cell coordinates
+        # of each orbital:
+        # Ex: [(array([0,0]), 'A', (0,0)), (array([0,0]), 'B', (0,0)), (array([2,0]), 'A', (1,0)), ...]
+        self._orbitals         = []
         
-        if self.boundary is None:
-            self.boundary = tuple(['Open']*len(num_cells))
-
-        if len(boundary) != len(num_cells):
-            raise ValueError('The size of boundary and num_cells in the lattice are inconsistent: {} and {}'.format(len(boundary), len(num_cells)))
-
-        # Number of orbitals in lattice.
-        N = len(self.unit_cell.labels)*np.prod(self.num_cells)
-        # Dimensionality of lattice vectors.
-        d = int(self.unit_cell.positions.shape[0])
+        # Dictionary that maps tuples of position (as strings) and orbital names to
+        # the index in the self._orbitals list.
+        # Ex: self._indices_orbitals[('array([2 0])', 'A')] = 2
+        self._indices_orbitals = dict()
         
-        self.labels    = []
-        self.positions = np.zeros((d,N))
+        # Dictionary that maps 
 
-        ind_pos = 0
-        for ind_uc in range(len(self.unit_cell.labels)):
-            label_uc    = self.unit_cell.labels[ind_uc]
-            position_uc = self.unit_cell.positions[:,ind_uc]
+        ranges       = tuple([range(num_cell) for num_cell in num_cells])
+        coords_cells = list(it.product(*ranges))
 
-            if type(label_uc) is not tuple:
-                label_uc = (label_uc,)
+        self.dim = len(num_cells)
+
+        if periodic_boundaries is None:
+            self.periodic_boundaries = np.zeros(self.dim, dtype=bool)
+        else:
+            self.periodic_boundaries = np.array(periodic_boundaries, dtype=bool)
             
-            if len(self.num_cells) == 1:
-                for ind1 in range(self.num_cells[0]):
-                    label = label_uc + (ind1,)
-                    pos   = position_uc + ind1*self.unit_cell.lattice_vectors[:,0]
-                    self.labels.append(label)
-                    self.positions[:,ind_pos] = pos
-                    ind_pos += 1
-                    
-            elif len(self.num_cells) == 2:
-                for ind1 in range(self.num_cells[0]):
-                    for ind2 in range(self.num_cells[1]):
-                        label = label_uc + (ind1,ind2)
-                        pos   = position_uc + ind1*self.unit_cell.lattice_vectors[:,0] + ind2*self.unit_cell.lattice_vectors[:,1]
-                        self.labels.append(label)
-                        self.positions[:,ind_pos] = pos
-                        ind_pos += 1
-                        
-            elif len(self.num_cells) == 3:
-                for ind1 in range(self.num_cells[0]):
-                    for ind2 in range(self.num_cells[1]):
-                        for ind3 in range(self.num_cells[2]):
-                            label = label_uc + (ind1,ind2,ind3)
-                            pos   = position_uc + ind1*self.unit_cell.lattice_vectors[:,0] + ind2*self.unit_cell.lattice_vectors[:,1] + ind3*self.unit_cell.lattice_vectors[:,2]
-                            self.labels.append(label)
-                            self.positions[:,ind_pos] = pos
-                            ind_pos += 1
+        for coords_cell in coords_cells:
+            for (pos_atom, orbitals_atom) in zip(self.unit_cell.atom_positions, self.unit_cell.atom_orbitals):
+                pos = np.zeros(self.dim)
+                for ind_vec in range(self.dim):
+                    pos += coords_cell[ind_vec] * unit_cell.lattice_vectors[ind_vec]
+                pos += pos_atom
+                pos_name = np.array2string(pos.flatten(), precision=8)
 
-    def distance(self, pos1, pos2):
-        # TODO: implement mirror distance convention
-        # Assumes open boundaries
-        return np.linalg.norm(pos1-pos2)
+                for orbital_name in orbitals_atom:
+                    ind_orbital = len(self._orbitals)
+                    self._orbitals.append((pos, orbital_name, coords_cell))
+                    self._indices_orbitals[(pos_name, orbital_name)] = ind_orbital
+                    
+        # These vectors translate one periodic edge of a lattice
+        # to another. They are used to check for wrapping of points
+        # around the periodic edges.
+        self._boundary_vectors = [np.zeros(self.dim)]
+        for ind_vec in range(self.dim):
+            if self.periodic_boundaries[ind_vec]:
+                previous_bvecs = list(self._boundary_vectors)
+                boundary_vec   = self.num_cells[ind_vec] * self.unit_cell.lattice_vectors[ind_vec]
+
+                self._boundary_vectors = previous_bvecs \
+                                         + [boundary_vec + pbv for pbv in previous_bvecs] \
+                                         + [-boundary_vec + pbv for pbv in previous_bvecs]
+                    
+    def index(self, position, orbital_name=''):
+        """Return the index of the orbital whose atom is located
+        at the given position in the Lattice.
+
+        Parameters
+        ----------
+        position : ndarray, (d,)
+            The coordinate of the atom associated with the orbital.
+            If the lattice is periodic in any direction and `position`
+            is outside of the periodic boundaries of the lattice, it 
+            will be wrapped back into the lattice.
+        orbital_name : hashable, optional
+            The name of the orbital.
+
+        Returns
+        -------
+        int
+            The index of the orbital in the lattice.
+        """
+        
+        # Translate by the boundary vectors associated with
+        # the periodic edges. The first boundary vector is the
+        # zero vector, which corresponds to no translation.
+        for boundary_vector in self._boundary_vectors:
+            pos      = position + boundary_vector
+            pos_name = np.array2string(pos.flatten(), precision=8)
+            if (pos_name, orbital_name) in self._indices_orbitals:
+                return self._indices_orbitals[(pos_name, orbital_name)]
+
+        return -1
+        
+    def distance(self, index1, index2):
+        """Compute the minimum distance between two orbitals with
+        the given indices.
+
+        Parameters
+        ----------
+        index1 : int
+            The index of the first orbital.
+        index2 : int
+            The index of the second orbital.
+
+        Returns
+        -------
+            The closest distance between the first and second orbital.
+        """
+
+        (pos1, orbital_name1) = self._orbitals[index1]
+        (pos2, orbital_name2) = self._orbitals[index2]
+        
+        mirror_distances = [np.linalg.norm((pos1+bv)-pos2) for bv in self._boundary_vectors]
+        return np.minimum(mirror_distances)
+    
+    def __iter__(self):
+        """Return an iterator over the positions, the names,
+        and the unit cell coordinates of the orbitals.
+
+        Returns
+        -------
+        iterator over tuples of ndarray and hashable
+
+        Examples
+        --------
+        To collect a list of positions of all orbitals named `'B'`:
+            >>> positionsB = [position for (position, orbital_name, cell_coords) in lattice if orbital_name == 'B']
+        """
+        
+        return iter(self._orbitals)
                             
     def __str__(self):
-        """Convert Lattice object to a string representation of the lattice.
+        """Convert Lattice to a python string representation.
 
         Returns
         -------
         str
-            String representation of lattice.
+            String representation of the Lattice.
+
+        Examples
+        --------
+            >>> print(lattice)
         """
 
         list_strings = []
-        for ind_label in range(len(self.labels)):
-            label = self.labels[ind_label]
-            pos   = self.positions[:,ind_label]
-            list_strings += [str(label), ' ', str(pos), '\n']
+        for (position, orbital_names) in self._orbitals:
+            list_strings += [str(position)]
+            for orbital_name in orbital_names:
+                list_strings += [' ', str(orbital_name)]
+            list_strings += ['\n']
 
         result = ''.join(list_strings)
         return result
@@ -163,24 +202,106 @@ def plot(lattice, with_labels=False):
         Annotate each lattice point with its 
         label if True. False by default.
     
+    Examples
+    --------
+       >>> qosy.plot(lattice)
+       >>> qosy.show()
     """
+
+    # How much space to separate the orbitals
+    # on the same atom in the plot.
+    intra_atom_spacing = 0.1*np.min([np.linalg.norm(vec) for vec in lattice.unit_cell.lattice_vectors])
     
-    # Plot the first unit cell's positions.
-    x_uc = lattice.unit_cell.positions[0,:]
-    y_uc = lattice.unit_cell.positions[1,:]
-    plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10)
+    if lattice.dim == 1:
+        # Plot the first unit cell separately.
+        x_uc = []
+        y_uc = []
+        names = []
+        for (position, orbital_names) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
+            intra_atom_shifts = intra_atom_spacing * np.linspace(-1.0, 1.0, len(orbital_names))
+            for ind_shift in range(len(orbital_names)):
+                x_uc.append(position[0])
+                y_uc.append(intra_atom_shifts[ind_shift])
+                names.append(orbital_names[ind_shift])
 
-    # Plot all of the lattice positions.
-    x_l = lattice.positions[0,:]
-    y_l = lattice.positions[1,:]
-    plt.plot(x_l, y_l, 'ko', markeredgecolor='k', markersize=8)
+        if with_labels:
+            for (x,y,name) in zip(x_uc,y_uc,names):
+                plt.annotate(name, xy=(x,y), color='r')
+        else:        
+            plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10)
 
-    # Plot the labels of the lattice positions.
-    if with_labels:
-        # TODO:
-        raise NotImplementedError('Plotting the labels is not implemented yet.')
+        xs = []
+        ys = []
+        for (position, orbital_name, cell_coords) in lattice:
+            xs.append(position[0])
+            ys.append(0.0)
 
-    plt.axis('equal')
+        plt.plot(xs, ys, 'ko', markeredgecolor='k', markersize=8)
+
+        plt.xlim(np.min(xs)-1, np.max(xs)+1)
+        plt.ylim(-1,1)
+        
+        plt.axis('equal')
+                
+    elif lattice.dim == 2:
+        # Plot the first unit cell separately.
+        x_uc = []
+        y_uc = []
+        names = []
+        for (position, orbital_names) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
+            thetas = 2.0*np.pi*np.arange(len(orbital_names))/float(len(orbital_names))
+            for (theta, name) in zip(thetas, orbital_names):
+                x_uc.append(position[0] + intra_atom_spacing*np.cos(theta))
+                y_uc.append(position[1] + intra_atom_spacing*np.sin(theta))
+                names.append(name)
+                
+        if with_labels:
+            for (x,y,name) in zip(x_uc,y_uc,names):
+                plt.annotate(name, xy=(x,y), color='r')
+        else:
+            plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10)
+                
+        xs = []
+        ys = []
+        for (position, orbital_name, cell_coords) in lattice:
+            xs.append(position[0])
+            ys.append(position[1])
+
+        plt.plot(xs, ys, 'ko', markeredgecolor='k', markersize=8)
+
+        plt.xlim(np.min(xs)-1, np.max(xs)+1)
+        plt.xlim(np.min(ys)-1, np.max(ys)+1)
+
+        plt.axis('equal')
+        
+    elif lattice.dim == 3:
+        # Plot the first unit cell separately.
+        x_uc = []
+        y_uc = []
+        z_uc = []
+        for (position, orbital_names) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
+            thetas = 2.0*np.pi*np.arange(len(orbital_names))/float(len(orbital_names))
+            for theta in thetas:
+                x_uc.append(position[0] + intra_atom_spacing*np.cos(theta))
+                y_uc.append(position[1] + intra_atom_spacing*np.sin(theta))
+                z_uc.append(position[2])
+
+        ax.scatter(x_uc, y_uc, z_uc, 'rs', markeredgecolor='r', markersize=10)
+
+        xs = []
+        ys = []
+        zs = []
+        for (position, orbital_name, cell_coords) in lattice:
+            xs.append(position[0])
+            ys.append(position[1])
+            zs.append(position[2])
+
+        ax.scatter(xs, ys, zs, 'ko', markeredgecolor='k', markersize=8)
+        
+        if with_labels:
+            raise NotImplementedError('Plotting the labels is not supported in 3D.')
+    else:
+        raise ValueError('Cannot plot a {}-dimensional lattice.'.format(lattice.dim))
     
 def show():
     """Display a figure.
@@ -189,38 +310,48 @@ def show():
     plt.show()
 
 
-def chain(N, boundary=('Open',)):
+def chain(N, orbital_names=None, periodic=False):
     """Construct a 1D chain lattice.
 
     Parameters
     ----------
     N : int
         The number of unit cells in the chain.
-    boundary : (str,), optional
-        The boundary condition ('Open' or 'Periodic').
-        Defaults to ('Open',).
+    orbital_names : list of hashable
+        The names of the orbitals in each unit cell if there
+        is more than one orbital per unit cell. Default is
+        one (unnamed) orbital per unit cell.
+    periodic : bool, optional
+        Specifies whether the boundary condition is periodic
+        rather than open. Default is False (open).
+
+    Returns
+    -------
+    Lattice
+        A 1D chain lattice.
+
+    Examples
+    --------
+    To create a twelve site periodic chain
+        >>> qosy.lattice.chain(12, periodic=True)
     """
     
     # Lattice spacing
     a  = 1.0
     # Lattice vector
-    a1 = a * np.array([[1.0]])
-    lattice_vectors = a1
-    
-    # The single orbital's label in the unit cell.
-    labels = [1]
-    # The single orbital's position in the unit cell.
-    positions = np.zeros((1,1))
-    
-    # Construct the unit cell.
-    unit_cell = UnitCell(labels, positions, lattice_vectors)
+    a1 = a * np.array([1.0])
+    lattice_vectors = [a1]
+
+    # Construct the unit cell: a single atom with many orbitals.
+    unit_cell = UnitCell(lattice_vectors)
+    unit_cell.add_atom(np.zeros(1), orbital_names)
     
     # Construct the lattice.
-    lattice = Lattice(unit_cell, (N,), boundary=boundary)
+    lattice = Lattice(unit_cell, (N,), periodic_boundaries=(periodic,))
 
     return lattice
     
-def kagome(N1, N2, boundary=('Open','Open')):
+def kagome(N1, N2, periodic_boundaries=None):
     """Construct a 2D Kagome lattice.
 
     Parameters
@@ -228,79 +359,47 @@ def kagome(N1, N2, boundary=('Open','Open')):
     N1,N2 : int
         The number of unit cells in the 
         directions of the lattice vectors.
-    boundary : (str, str), optional
-        The boundary conditions ('Open' or 
-        'Periodic') in the directions of 
-        the lattice vectors. Defaults to 
-        ('Open', 'Open').
+    periodic_boundaries : (bool, bool), optional
+        The periodic boundary conditions in 
+        the directions of the lattice vectors. 
+        Defaults to (False, False).
 
     Returns
     -------
     Lattice
         A Lattice object representation 
         of the Kagome lattice.
+
+    Examples
+    --------
+    To create a 4 x 3 Kagome lattice on a cylinder geometry
+        >>> qosy.lattice.kagome(4, 3, (True, False))
     """
+
+    if periodic_boundaries is None:
+        periodic_boundaries = (False, False)
 
     # Lattice spacing
     a  = 1.0
     # Lattice vectors
-    a1 = a * np.array([[1.0], [0.0]])
-    a2 = a * np.array([[1.0/2.0], [np.sqrt(3.0)/2.0]])
-    lattice_vectors = np.hstack((a1,a2))
+    a1 = a * np.array([1.0, 0.0])
+    a2 = a * np.array([1.0/2.0, np.sqrt(3.0)/2.0])
+    lattice_vectors = [a1, a2]
     
     # Labels of the three sites in the unit cell.
-    labels = [1,2,3]
+    labels = ['A','B','C']
     # positions of the three sites in the unit cell.
-    r1 = np.zeros((2,1))
+    r1 = np.zeros(2)
     r2 = a1 / 2.0
     r3 = a2 / 2.0
-    positions = np.hstack((r1,r2,r3))
+    positions = [r1,r2,r3]
 
     # Construct the unit cell.
-    unit_cell = UnitCell(labels, positions, lattice_vectors)
+    unit_cell = UnitCell(lattice_vectors)
+    for (atom_position, orbital_name) in zip(positions, labels):
+        unit_cell.add_atom(atom_position, [orbital_name])
     
     # Construct the lattice.
-    lattice = Lattice(unit_cell, (N1,N2), boundary=boundary)
+    lattice = Lattice(unit_cell, (N1,N2), periodic_boundaries=periodic_boundaries)
 
     return lattice
-
-def decorate(lattice, extra_labels):
-    """Decorate a lattice's orbitals with extra labels.
-
-    Parameters
-    ----------
-    lattice : Lattice object
-        The lattice to decorate.
-    extra_labels : array_like of hashable, (l,)
-        The extra labels to assign to each orbital.
-
-    Returns
-    -------
-    Lattice
-        A new lattice with l times more labels.
-    """
-
-    result = Lattice(lattice.unit_cell, lattice.num_cells, lattice.boundary)
-
-    num_extra_labels = len(extra_labels)
-    
-    new_labels    = []
-    new_positions = np.zeros((int(lattice.positions.shape[0]), int(lattice.positions.shape[1])*num_extra_labels))
-    ind_new_label = 0
-    for ind_label in range(len(lattice.labels)):
-        label = lattice.labels[ind_label]
-        pos   = lattice.positions[:,ind_label]
-        for ind_extra_label in range(num_extra_labels):
-            extra_label = extra_labels[ind_extra_label]
-            if type(extra_label) is not tuple:
-                extra_label = (extra_label,)
-            
-            new_labels.append(label + extra_label)
-            new_positions[:,ind_new_label] = pos
-            
-            ind_new_label += 1
-
-    result.labels    = new_labels
-    result.positions = new_positions
-
-    return result

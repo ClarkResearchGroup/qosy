@@ -9,12 +9,12 @@ from .operatorstring import OperatorString
 
 class Basis:
     """A Basis object represents a basis of operators
-    spanned by operator string basis vectors.
+    spanned by OperatorStrings :math:`\hat{h}_a`.
         
     Attributes
     ----------
     op_strings : list of OperatorStrings
-        The list of OperatorStrings to store in the Basis.
+        The list of OperatorStrings :math:`\hat{h}_a` to store in the Basis.
     """
     
     def __init__(self, op_strings=None):
@@ -52,12 +52,17 @@ class Basis:
         Parameters
         ----------
         op_string : OperatorString
-             The OperatorString to find in the Basis.
+            The OperatorString to find in the Basis.
 
         Returns
         -------
         int
-             The index of the OperatorString in the Basis.
+            The index of the OperatorString in the Basis.
+
+        Raises
+        ------
+        KeyError
+            When the OperatorString is not in the Basis.
         """
         return self._indices[op_string]
 
@@ -113,7 +118,7 @@ class Basis:
         return len(self.op_strings)
 
     def __str__(self):
-        """Return a string representation of the basis in human-readable format.
+        """Return a string representation of the Basis in human-readable format.
 
         Returns
         -------
@@ -121,7 +126,7 @@ class Basis:
 
         Examples
         --------
-            >>> print(basis) # Prints a string representation of the basis
+            >>> print(basis) # Prints a string representation of the Basis
         """
 
         list_strings = []
@@ -133,7 +138,7 @@ class Basis:
         return result
 
     def __contains__(self, item):
-        """Check if an OperatorString is in the basis.
+        """Check if an OperatorString is in the Basis.
 
         Parameters
         ----------
@@ -154,20 +159,20 @@ class Basis:
         return item in self._indices
 
     def __add__(self, other):
-        """Create a new basis with an additional operator string
-        or many new operator strings provided by another basis.
+        """Create a new Basis with an additional OperatorString
+        or many new OperatorStrings provided by another Basis.
 
         Parameters
         ----------
         other : OperatorString or Basis
-            The operator string or basis of operator strings to add
-            to the current basis. Any repeated OperatorStrings will not
+            The OperatorString or Basis of OperatorStrings to add
+            to the current Basis. Any repeated OperatorStrings will not
             be double-counted.
 
         Returns
         -------
         Basis
-            The enlarged basis.
+            The enlarged Basis.
 
         Examples
         --------
@@ -242,13 +247,13 @@ class Basis:
 
 class Operator:
     """An Operator object represents a quantum operator
-    :math:`\hat{O}=\sum_a J_a \hat{h}_a` that is a linear
+    :math:`\hat{\mathcal{O}}=\sum_a g_a \hat{h}_a` that is a linear
     combination of OperatorStrings :math:`\hat{h}_a`.
         
     Attributes
     ----------
     coeffs : list or ndarray of complex
-        The coefficients :math:`J_a` in front of the 
+        The coefficients :math:`g_a` in front of the 
         OperatorStrings :math:`\hat{h}_a`. If all 
         coefficients are real, then the operator
         is Hermitian.
@@ -347,12 +352,12 @@ class Operator:
     def norm(self):
         """Compute the Hilbert-Schmidt norm of the Operator. 
 
-        For an Operator :math:`\hat{O}=\sum_a J_a \hat{h}_a`  
+        For an Operator :math:`\hat{\mathcal{O}}=\sum_a g_a \hat{h}_a`  
         made of orthonormal OperatorStrings :math:`\hat{h}_a` 
         that satisfy :math:`\\langle \hat{h}_a, \hat{h}_b\\rangle = \\textrm{tr}(\hat{h}_a^\dagger \hat{h}_b)/\\textrm{tr}(\hat{I}) =\delta_{ab}`,
         the (squared) Hilbert-Schmidt norm is
-            :math:`||\hat{O}||^2 = \sum_a J_a^2`
-        which is just the :math:`\ell_2`-norm of the :math:`J_a`
+            :math:`||\hat{\mathcal{O}}||^2 = \sum_a g_a^2`
+        which is just the :math:`\ell_2`-norm of the :math:`g_a`
         vector.
 
         Returns
@@ -465,18 +470,18 @@ class Operator:
         return self
 
     def __mul__(self, other):
-        """Compute the product of this Operator and a number.
+        """Compute the product of this Operator and a scalar.
 
         Parameters
         ----------
         other : float or complex
-            The number to multiply the Operator.
+            The scalar to multiply the Operator.
 
         Returns
         -------
         Operator
             The Operator with its coefficient's 
-            multipled by the number
+            multipled by the scalar.
 
         Examples
         --------
@@ -487,18 +492,18 @@ class Operator:
         return Operator(self.coeffs * other, self._basis.op_strings, self.op_type)
 
     def __rmul__(self, other):
-        """Compute the product of this Operator and a number.
+        """Compute the product of this Operator and a scalar.
 
         Parameters
         ----------
         other : float or complex
-            The number to multiply the Operator.
+            The scalar to multiply the Operator.
 
         Returns
         -------
         Operator
             The Operator with its coefficient's 
-            multipled by the number
+            multipled by the scalar.
 
         Examples
         --------
@@ -641,27 +646,27 @@ class Operator:
         return self.op_type == other.op_type and (len(self.coeffs) == len(other.coeffs)) and (self.coeffs == other.coeffs).all() and self._basis == other._basis
     
 def cluster_basis(k, cluster_labels, op_type, include_identity=False):
-    """Constructs a basis of operator strings from the labels
-    of a "cluster" of orbitals. The operator strings in the cluster basis
-    are all possible combinations of up to k-local operator strings on the 
+    """Constructs a Basis of OperatorStrings from the labels
+    of a "cluster" of orbitals. The OperatorStrings in the cluster Basis
+    are all possible combinations of up to k-local OperatorStrings on the 
     cluster.
 
     Parameters
     ----------
     k : int
         Specifies the maximum number of non-identity orbital operators
-        in the operator strings in this basis.
+        in the OperatorStrings in this Basis.
     cluster_labels : list or ndarray of int
         The integer labels of the orbitals that are in the cluster.
     include_identity : bool, optional
-        Specifies whether to include the identity operator in the basis.
-        The default is to not include it to keep the basis operators 
+        Specifies whether to include the identity operator in the Basis.
+        The default is to not include it to keep the Basis's OperatorStrings 
         traceless.
 
     Returns
     -------
     Basis
-        The basis of OperatorStrings.
+        The Basis of OperatorStrings.
 
     Examples
     --------

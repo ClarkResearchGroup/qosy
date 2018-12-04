@@ -22,8 +22,8 @@ def _fermion_string_from_cdag_c_labels(prefactor, c_dag_labels, c_labels):
     return OperatorString(orbital_operators, orbital_labels, prefactor=prefactor, op_type='Fermion')
 
 def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
-    # Converts a Majorana StringOperator to an Operator
-    # that is a linear combination of Fermion StringOperators.
+    # Converts a Majorana string to an Operator
+    # that is a linear combination of Fermion strings.
     
     if op_string.op_type is not 'Majorana':
         raise ValueError('Trying to convert a Majorana string to a Fermion string but given an OperatorString of type {}'.format(op_type))
@@ -125,8 +125,8 @@ def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
 
 
 def _convert_fermion_string(op_string, include_identity=False, tol=1e-12):
-    # Converts a Fermion OperatorString into a linear
-    # combination of Majorana OperatorStrings.
+    # Converts a Fermion string into an Operator
+    # that is a linear combination of Majorana strings.
 
     # Obtain the labels of the CDag and C operators (in ascending order).
     cdag_labels = [o_lab for (o_lab, o_op) in zip(op_string.orbital_labels, op_string.orbital_operators) if o_op == 'CDag']
@@ -260,28 +260,22 @@ def _convert_operator(operator, to_op_type, include_identity=False):
 
 def convert(operator, to_op_type, include_identity=False):
     """Convert an Operator or OperatorString from 
-    one operator string type to an Operator of the 
-    given operator string type. Note that an operator
-    string of one type can be a linear combination of 
-    exponentially many operator strings of another 
-    type. Therefore, it can be inefficient to perform 
-    this conversion, e.g., if converting an operator 
-    string with support on many orbitals.
+    one OperatorString type to another.
 
     Parameters
     ----------
     operator : Operator or OperatorString
-        The operator to convert.
+        The Operator or OperatorString to convert.
     to_op_type : str
         The type of operator to convert to. Currently, 
         only conversion between 'Fermion' and 'Majorana' 
-        operator strings are supported.
+        OperatorStrings are supported.
     include_identity : bool, optional
-        Specifies whether to include the identity operator
-        in the output operator. By default, the identity
+        Specifies whether to include the identity OperatorString
+        in the output Operator. By default, the identity
         is not included. (This can be interpreted as
-        subtracting multiples of the identity from the 
-        Fermion strings to make them traceless.)
+        subtracting multiples of the identity from
+        traceful OperatorStrings to make them traceless.)
 
     Returns
     -------
@@ -290,8 +284,22 @@ def convert(operator, to_op_type, include_identity=False):
 
     Examples
     --------
-    >>> qosy.convert(qosy.opstring('CDag 1 C 1'), 'Majorana')
-    >>> qosy.convert(qosy.opstring('A 1 B 2'), 'Fermion')
+        >>> qosy.convert(qosy.opstring('CDag 1 C 1'), 'Majorana')
+        >>> qosy.convert(qosy.opstring('1j A 1 B 2'), 'Fermion')
+
+    Notes
+    -----
+    Note that an OperatorString of one type can be a 
+    linear combination of exponentially many OperatorStrings 
+    of another type. For example, the single Majorana string
+        :math:`\hat{d}_1 \cdots \hat{d}_N = (\hat{I}-2\hat{c}^\dagger_1 \hat{c}_1) \cdots (\hat{I}-2\hat{c}^\dagger_N \hat{c}_N)`
+    is a linear combination of :math:`2^N` Fermion strings.
+
+    Therefore, it can be inefficient to perform this 
+    conversion in general if converting an OperatorString 
+    with support on many orbitals. In such
+    circumstances, the `convert` method should be 
+    avoided.
     """
     
     if isinstance(operator, OperatorString):
@@ -302,49 +310,50 @@ def convert(operator, to_op_type, include_identity=False):
         raise TypeError('Cannot convert invalid operator type: {}'.format(type(operator)))
 
 def conversion_matrix(basis_from, basis_to, tol=1e-12):
-    """Constructs a basis transformation matrix for
+    """Construct a basis transformation matrix for
     converting between two different Bases of 
     OperatorStrings.
 
     Consider an operator of the form 
-    O = \sum_a J_a h_a = \sum_b J_b' h_b'
-    where h_a and h_b' are operator string
-    basis vectors from two different bases.
+        :math:`\hat{\mathcal{O}} = \sum_a g_a \hat{h}_a = \sum_b g_b' \hat{h}_b'`
+    where :math:`\hat{h}_a` and :math:`\hat{h}_b'` 
+    are OperatorString basis vectors from two 
+    different Bases.
 
-    The transformation matrix B_{ba} that
+    The transformation matrix :math:`B_{ba}` that
     this method computes satisfies 
-        h_a = \sum_b B_{ba} h_b'
+        :math:`\hat{h}_a = \sum_b B_{ba} \hat{h}_b'`
     or 
-          h = B h'
-    in matrix-vector notation. If the h_a 
+          :math:`\\textbf{h} = \\textbf{B} \\textbf{h}'`
+    in matrix-vector notation. If the :math:`h_a` 
     form an orthonormal basis, then
-       J'_b = \sum_a B_{ba} J_a  
+       :math:`g'_b = \sum_a B_{ba} g_a`
     or 
-         J' = B J
+         :math:`\\textbf{g}' = \\textbf{B} \\textbf{g}`
     in matrix-vector notation
     
     Parameters
     ----------
-    basis_from : Basis, (d,)
+    basis_from : Basis
         The Basis of OperatorStrings to convert from.
-    basis_to : Basis, (d,)
+    basis_to : Basis
         The Basis of OperatorStrings to convert to.
 
     Returns
     -------
-    scipy.sparse.csc_matrix of complex, (d,d)
+    scipy.sparse.csc_matrix of complex
         A sparse, invertible basis transformation matrix.
 
     Examples
     --------
-    To convert between bases of Majorana and Fermion strings:
-    >>> basisA = qosy.cluster_basis(2, [1,2], 'Majorana')
-    >>> basisB = qosy.cluster_basis(2, [1,2], 'Fermion')
-    >>> B = qosy.conversion_matrix(basisA, basisB)
+    To convert between bases of two-orbital Majorana and Fermion strings:
+        >>> basisA = qosy.cluster_basis(2, [1,2], 'Majorana')
+        >>> basisB = qosy.cluster_basis(2, [1,2], 'Fermion')
+        >>> B = qosy.conversion_matrix(basisA, basisB)
     The inverse transformation matrix can be built in two ways:
-    >>> import scipy.sparse.linalg as sla
-    >>> Binv = sla.inv(B)
-    >>> Binv = qosy.conversion_matrix(basisB, basisA)
+        >>> import scipy.sparse.linalg as sla
+        >>> Binv1 = sla.inv(B)
+        >>> Binv2 = qosy.conversion_matrix(basisB, basisA)
     """
 
     if len(basis_from) != len(basis_to):

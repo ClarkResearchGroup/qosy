@@ -196,7 +196,7 @@ def test_structure_constants_simple():
     
     (structure_constants_list, basisC) = qy.algebra.structure_constants(basisA, basisB, return_extended_basis=True)
 
-    assert(np.allclose(structure_constants_list[0].todense(), expected_structure_constants))
+    assert(np.allclose(structure_constants_list[0].toarray(), expected_structure_constants))
 
     assert(set(basisC.op_strings) == set(expected_basisC.op_strings))
 

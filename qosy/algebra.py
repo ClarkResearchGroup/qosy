@@ -296,11 +296,13 @@ def commutant_matrix(basis, operator, operation_mode='commutator'):
     Parameters
     ----------
     basis : Basis
-        The Basis of OperatorStrings to express the commutant matrix.
+        The Basis of OperatorStrings :math:`\hat{h}_a` to express the commutant matrix in.
+    operator : Operator
+        The operator :math:`\hat{\mathcal{O}}`.
     
     Returns
     -------
-    scipy.sparse.csc_matrix
+    scipy.sparse.csc_matrix of complex
         The commutant matrix as a complex, sparse matrix.
 
     Examples

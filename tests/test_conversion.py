@@ -79,11 +79,11 @@ def test_majorana_to_fermion_conversion():
     # Check identities: a_j = c_j + c^\dagger_j, b_j = i c^\dagger_j - i c_j
     fermion_operator          = qy.convert(qy.opstring('A 1'), 'Fermion')
     expected_fermion_operator = qy.Operator(np.array([1.0]), [qy.opstring('CDag 1')])
-    assert((expected_fermion_operator - fermion_operator).norm() < 1e-12)
+    assert(np.allclose((expected_fermion_operator - fermion_operator).coeffs, 0.0))
 
     fermion_operator          = qy.convert(qy.opstring('B 1'), 'Fermion')
     expected_fermion_operator = qy.Operator(np.array([1.0]), [qy.opstring('1j CDag 1')])
-    assert((expected_fermion_operator - fermion_operator).norm() < 1e-12)
+    assert(np.allclose((expected_fermion_operator - fermion_operator).coeffs, 0.0))
     
     # (1) i a_1 a_2 
     #       = i c^\dagger_1 c^\dagger_2 + i c^\dagger_1 c_2 + H.c.
@@ -96,7 +96,7 @@ def test_majorana_to_fermion_conversion():
 
     expected_fermion_operator = qy.Operator(expected_coeffs, expected_fermion_strings)
 
-    assert((expected_fermion_operator - fermion_operator).norm() < 1e-12)
+    assert(np.allclose((expected_fermion_operator - fermion_operator).coeffs, 0.0))
     
     # (2) d_1 d_2 
     #       = -I - 2 c^\dagger_1 c_2 - 2 c^\dagger_2 c_2 + 4 c^\dagger_1 c^\dagger_1 c^\dagger_2 c_2 c_1
@@ -115,7 +115,7 @@ def test_majorana_to_fermion_conversion():
 
     expected_fermion_operator = qy.Operator(expected_coeffs, expected_fermion_strings)
 
-    assert((expected_fermion_operator - fermion_operator).norm() < 1e-12)
+    assert(np.allclose((expected_fermion_operator - fermion_operator).coeffs, 0.0))
 
     # Exclude identity
     majorana_string  = qy.opstring('D 1 D 2')
@@ -128,7 +128,7 @@ def test_majorana_to_fermion_conversion():
     
     expected_fermion_operator = qy.Operator(expected_coeffs, expected_fermion_strings)
     
-    assert((expected_fermion_operator - fermion_operator).norm() < 1e-12)
+    assert(np.allclose((expected_fermion_operator - fermion_operator).coeffs, 0.0))
 
 def test_conversions_are_consistent():
     # Create random Fermion strings, convert them to Majorana strings,
@@ -151,7 +151,7 @@ def test_conversions_are_consistent():
         fermion_operator2 = qy.convert(majorana_operator, 'Fermion')
 
         # Check that you get the original operator before conversion.
-        assert((fermion_operator1 - fermion_operator2).norm() < 1e-12)
+        assert(np.allclose((fermion_operator1 - fermion_operator2).coeffs, 0.0))
     
     # Create random Majorana strings, convert them to Fermion strings,
     # and convert them back to Majorana strings. You should always get
@@ -182,9 +182,6 @@ def test_conversion_matrix():
     orbital_labels = np.arange(num_orbitals)
     basisA = qy.cluster_basis(2, [1,2], 'Majorana')
     basisB = qy.cluster_basis(2, [1,2], 'Fermion')
-
-    print(basisA)
-    print(basisB)
     
     B = qy.conversion_matrix(basisA, basisB)
 

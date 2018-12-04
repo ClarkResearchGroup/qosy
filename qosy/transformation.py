@@ -290,7 +290,7 @@ def label_permutation(permutation):
     -------
     Transformation
         The Transformation that implements the
-        orbital relabelling.
+        orbital relabeling.
 
     Examples
     --------
