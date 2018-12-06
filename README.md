@@ -29,7 +29,7 @@ Qosy requires the following software installed on your platform:
 
 To copy the development version of the code to your machine, type
 ```
-git clone https://github.com/echertkov/qosy.git
+git clone https://github.com/ClarkResearchGroup/qosy.git
 ```
 To install, type
 ```
