@@ -232,7 +232,8 @@ class SymmetricOperatorGenerator:
         >>> generator = qosy.SymmetricOperatorGenerator(basis)
     Then add symmetries that you want to enforce
     on your operators to the generator
-        >>> T = qosy.time_reversal() # discrete symmetry
+        >>> # Discrete time-reversal symmetry transformation
+        >>> T = qosy.time_reversal()
         >>> # The generators of the continuous global SU(2) symmetry:
         >>> totalX = qosy.Operator(np.ones(4), [qosy.opstring('X {}'.format(o)) for o in orbitals])
         >>> totalY = qosy.Operator(np.ones(4), [qosy.opstring('Y {}'.format(o)) for o in orbitals])
@@ -245,8 +246,9 @@ class SymmetricOperatorGenerator:
         >>> generator.generate()
     The results are stored in the ``generator`` object:
         >>> generator.output_operators[0]  # the operators obeying the first symmetry (T)
-        >>> generator.output_operators[1]  # the operators obeying the first two symmetries (T, totalX)
-        >>> generator.output_operators[-1] # the operators obeying all of the desired symmetries
+        >>> generator.output_operators[1]  # the operators obeying the second symmetry (totalX)
+        >>> generator.projected_output_operators[1]  # the operators obeying the first two symmetries (T, totalX)
+        >>> generator.projected_output_operators[-1] # the operators obeying all of the desired symmetries
     """
     
     def __init__(self, basis, num_vecs=None):
@@ -300,7 +302,7 @@ class SymmetricOperatorGenerator:
         This procedure occurs in three steps:
           1. *Generation:* In order, calculate the commutant matrix of 
              Operator :math:`\hat{\mathcal{O}}` or the symmetry matrix 
-             of Transformation :math:`\hat{\mathcal{U}}` and diagonalize them.
+             of Transformation :math:`\hat{\mathcal{U}}` and diagonalize it.
           2. *Projection:* In order, project the results for the previous 
              symmetries onto the current symmetry.
           3. *Orthogonalization:* (optional) In reverse order, orthogonalize the results

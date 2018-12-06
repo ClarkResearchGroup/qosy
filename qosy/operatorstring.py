@@ -233,22 +233,22 @@ def opstring(op_string_name, op_type=None):
     --------
     The Pauli string :math:`\hat{\sigma}^x_1 \hat{\sigma}^y_2 \hat{\sigma}^z_4` can 
     be constructed with
-    >>> qosy.opstring('X 1 Y 2 Z 4')
+        >>> qosy.opstring('X 1 Y 2 Z 4')
     or
-    >> qosy.opstring('1.0 X 1 Y 2 Z 4')
+        >>> qosy.opstring('1.0 X 1 Y 2 Z 4')
     The Majorana string :math:`i \hat{a}_1 \hat{b}_3 \hat{d}_5 \hat{d}_6` can be constructed with
-    >>> qosy.opstring('1j A 1 B 3 D 5 D 6')
+        >>> qosy.opstring('1j A 1 B 3 D 5 D 6')
     or simply
-    >>> qosy.opstring('A 1 B 3 D 5 D 6')
+        >>> qosy.opstring('A 1 B 3 D 5 D 6')
     The Fermion string :math:`\hat{c}_1^\dagger \hat{c}_2^\dagger \hat{c}_3 + H.c.` 
     can be constructed with
-    >>> qosy.opstring('CDag 1 CDag 2 C 3')
+        >>> qosy.opstring('CDag 1 CDag 2 C 3')
     The Fermion string :math:`i \hat{c}_1^\dagger \hat{c}_2^\dagger \hat{c}_3 + H.c.` 
     can be constructed with
-    >>> qosy.opstring('1j CDag 1 CDag 2 C 3')
+        >>> qosy.opstring('1j CDag 1 CDag 2 C 3')
     An identity operator :math:`\hat{I}` that can be used with Majorana 
     strings can be constructed with the special syntax
-    >>> qosy.opstring('I','Majorana')
+        >>> qosy.opstring('I','Majorana')
     """
     
     name_list = op_string_name.strip().split()

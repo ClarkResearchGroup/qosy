@@ -42,7 +42,7 @@ python setup.py install --user
 To generate the documentation on your machine, type
 
 ```
-cd qosy/doc
+cd qosy/docs
 make html
 ```
 

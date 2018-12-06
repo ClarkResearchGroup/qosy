@@ -7,6 +7,6 @@ setup(name='qosy',
       description='Quantum Operators from SYmmetries',
       author='Eli Chertkov',
       author_email='eli.chertkov@gmail.com',
-      url='https://github.com/echertkov/qosy',
+      url='https://github.com/ClarkResearchGroup/qosy',
       packages=['qosy']
      )
