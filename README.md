@@ -17,13 +17,13 @@ The tools can be used as either (1) a "forward method" to automatically generate
 ### Prerequisites
 
 Qosy requires the following software installed on your platform:
-- (Python)[https://www.python.org/]
-- (Numpy)[https://www.numpy.org/]
-- (Scipy)[https://www.scipy.org/]
-- If you want the visualization features: (Matplotlib)[https://www.matplotlib.org/]
-- If you want to use the tutorial ipython notebooks: (IPython)[https://www.ipython.org/]
-- If you want to build the documentation: (Sphinx)[http://www.sphinx-doc.org/]
-- If you want to run the tests: (pytest)[https://pytest.org]
+- [Python](https://www.python.org/)
+- [Numpy](https://www.numpy.org/)
+- [Scipy](https://www.scipy.org/)
+- If you want the visualization features: [Matplotlib](https://www.matplotlib.org/)
+- If you want to use the tutorial ipython notebooks: [IPython](https://www.ipython.org/)
+- If you want to build the documentation: [Sphinx](http://www.sphinx-doc.org/)
+- If you want to run the tests: [pytest](https://pytest.org)
 
 ### Installing
 
@@ -71,7 +71,7 @@ python -c 'import qosy; qosy.test()'
 
 ## License
 
-This project is licensed under the MIT License - see the (LICENSE)[./LICENSE] for details.
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) for details.
 
 ## References
 
