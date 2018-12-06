@@ -58,7 +58,8 @@ firefox _build/html/index.html
 
 To test Qosy after installation (recommended), type
 ```
-python -c 'import qosy; qosy.test()'
+cd qosy/tests
+pytest
 ```
 
 ## Tutorials
