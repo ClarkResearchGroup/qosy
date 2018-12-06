@@ -1,4 +1,16 @@
 #!/usr/bin/env python
+"""
+This module defines a Basis (of OperatorStrings) and an Operator object.
+These objects are convenient containers for OperatorStrings that are
+designed to handle the indexing and book-keeping necessary for calculations
+in ``qosy``.
+
+It also provides methods for constructing useful bases of OperatorStrings,
+that can be used, e.g., to automatically construct bases of local operators
+on arbitrary lattices.
+
+"""
+
 import warnings
 import numpy as np
 import itertools as it
@@ -6,6 +18,7 @@ import copy
 
 from .config import *
 from .operatorstring import OperatorString
+from .tools import maximal_cliques, compare
 
 class Basis:
     """A Basis object represents a basis of operators
@@ -44,7 +57,7 @@ class Basis:
             self._indices[op_string] = ind_os
 
         if len(self._indices) != len(self.op_strings):
-            raise ValueError('Tried to create a basis with multiple copies of the same operator string. There were {} operator strings, but only {} uniques ones.'.format(len(self.op_strings),len(self._indices)))
+            raise ValueError('Tried to create a Basis with multiple copies of the same OperatorString. There were {} OperatorStrings provided, but only {} uniques ones.'.format(len(self.op_strings),len(self._indices)))
 
     def index(self, op_string):
         """Return the index of the OperatorString in the Basis.
@@ -183,7 +196,10 @@ class Basis:
         if isinstance(other, Basis):
             new_op_strings = [os for os in other.op_strings if os not in self]
         elif isinstance(other, OperatorString):
-            new_op_strings = [other]
+            if other not in self:
+                new_op_strings = [other]
+            else:
+                new_op_strings = []
         else:
             raise TypeError('Cannot add object of type {} to basis.'.format(type(other)))
 
@@ -312,7 +328,7 @@ class Operator:
         if op_strings is None:
             op_strings = []
 
-        self._basis  = Basis(op_strings)
+        self._basis  = Basis(list(op_strings)) # Copies the op_strings list.
         self.op_type = op_type
 
         if len(self._basis.op_strings) != 0:
@@ -349,7 +365,7 @@ class Operator:
 
         return new_operator
 
-    def norm(self):
+    def norm(self, order=None):
         """Compute the Hilbert-Schmidt norm of the Operator. 
 
         For an Operator :math:`\hat{\mathcal{O}}=\sum_a g_a \hat{h}_a`  
@@ -360,6 +376,14 @@ class Operator:
         which is just the :math:`\ell_2`-norm of the :math:`g_a`
         vector.
 
+        Parameters
+        ----------
+        order : {non-zero int, inf, -inf, 'fro', 'nuc'}, optional
+            Order of the norm (see `numpy.norm`). Defaults to None,
+            which is the :math:`\ell_2`-norm. Another useful norm
+            is the `inf` order norm, which returns the maximum
+            :math:`|g_a|` value.
+
         Returns
         -------
         float
@@ -368,16 +392,25 @@ class Operator:
         Examples
         --------
         >>> operator = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
-        >>> operator.norm() # sqrt(2) = 1.414213
+        >>> operator.norm()          # sqrt(2) = 1.414213
+        >>> operator.norm(order=numpy.inf) # 1.0
         """
 
         if len(self._basis) > 0 and self._basis[0].op_type == 'Fermion':
             warnings.warn('Computing the normalization of Operators made of Fermion strings is not supported yet. Fermion strings do not form an orthonormal basis, so one would need to compute an overlap matrix. The norm is only reliable for zero operators.')
         
-        return np.linalg.norm(self.coeffs)
+        return np.linalg.norm(self.coeffs, ord=order)
 
-    def normalize(self):
+    def normalize(self, order=None):
         """Normalize the Operator to have unit norm.
+
+        Parameters
+        ----------
+        order : {non-zero int, inf, -inf, 'fro', 'nuc'}, optional
+            Order of the norm (see `numpy.norm`). Defaults to None,
+            which is the :math:`\ell_2`-norm. Another useful norm
+            is the `inf` order norm, which returns the maximum
+            :math:`|g_a|` value.
 
         Examples
         --------
@@ -386,7 +419,7 @@ class Operator:
         >>> operator.norm() # 1.0
         """
         
-        self.coeffs /= self.norm()
+        self.coeffs /= self.norm(order=order)
 
     def __add__(self, other):
         """Add an Operator to this Operator.
@@ -552,6 +585,17 @@ class Operator:
         
         return self.__iadd__(-1.0*other)
 
+    def __neg__(self):
+        """Return the negation of the Operator.
+
+        Returns
+        -------
+        Operator
+            The Operator with its coefficients negated.
+        """
+
+        return -1.0*self
+        
     def __iter__(self):
         """Return an iterator over the (coefficient, OperatorString)
         pairs of the Operator.
@@ -672,17 +716,20 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     --------
     To construct all possible (traceless) 1 and 2-site operators 
     made of Pauli strings on sites 1, 2, and 4, one can use
-    >>> basis1 = cluster_basis(2, [1,2,4], 'Pauli')
+        >>> basis1 = qosy.cluster_basis(2, [1,2,4], 'Pauli')
     """
     
     # The labels of the cluster in sorted order.
     cluster = copy.deepcopy(cluster_labels)
     cluster.sort()
     
-    op_strings = []
-
+    op_strings     = []
+    op_strings_set = set()
+    
     if include_identity:
-        op_strings.append(OperatorString([], [], op_type)) # Identity operator
+        identity = OperatorString([], [], op_type) # Identity operator
+        op_strings.append(identity)
+        op_strings_set.add(identity)
     
     max_num_operators = np.minimum(len(cluster), k)
 
@@ -698,7 +745,9 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
             for labels in possible_labels:
                 for ops in possible_ops:
                     op_string = OperatorString(list(ops), list(labels), op_type)
-                    op_strings.append(op_string)
+                    if op_string not in op_strings_set:
+                        op_strings.append(op_string)
+                        op_strings_set.add(op_string)
     elif op_type == 'Fermion':
         for num_operators_forward in np.arange(1,max_num_operators+1):
             possible_labels_forward = list(it.combinations(cluster, num_operators_forward))
@@ -712,8 +761,10 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                 labels = np.concatenate((labels_forward, labels_backward))
 
                 op_string = OperatorString(ops, labels, op_type)
-                
-                op_strings.append(op_string)
+
+                if op_string not in op_strings_set:
+                    op_strings.append(op_string)
+                    op_strings_set.add(op_string)
 
             # Operator of type 2 and 3: i^s * c^\dagger_{i_1} ... c^\dagger_{i_m} c_{j_l} ... c_{j_1} + H.c.
             for ind_labels_forward in range(len(possible_labels_forward)):
@@ -735,31 +786,99 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                             labels = np.concatenate((labels_forward, labels_backward))
                             
                             op_string = OperatorString(ops, labels, op_type, prefactor)
-                            
-                            op_strings.append(op_string)
+
+                            if op_string not in op_strings_set:
+                                op_strings.append(op_string)
+                                op_strings_set.add(op_string)
     else:
         raise ValueError('Unknown operator string type: {}'.format(op_type))
     
     return Basis(op_strings)
 
-"""
-def distance_basis(lattice, k, R, op_type, tol=1e-10):
-    num_positions = int(lattice.positions.shape[1])
-    distances = np.zeros((num_positions, num_positions))
-    for ind1 in range(num_positions):
-        pos1 = lattice.positions[:,ind1]
-        for ind2 in range(ind1+1,num_positions):
-            pos2 = lattice.positions[:,ind2]
-            
-            distances[ind1,ind2] = lattice.distance(pos1, pos2)
-            distances[ind2,ind1] = distances[ind1,ind2]
-            
-    clusters = [[lattice.labels[ind2] for ind2 in range(num_positions) if distances[ind1,ind2] <= R+tol] for ind1 in range(num_positions)]
+def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
+    """Constructs a Basis of OperatorStrings made of orbitals
+    that are spatially local.
 
+    Parameters
+    ----------
+    lattice : Lattice
+        The Lattice whose orbitals we want to use in this basis.
+    k : int
+        Specifies the maximum number of non-identity orbital operators
+        in the OperatorStrings in this Basis.
+    R : float
+        The maximum spatial distance between orbitals in an OperatorString.
+    include_identity : bool, optional
+        Specifies whether to include the identity operator in the Basis.
+        The default is to not include it to keep the Basis's OperatorStrings 
+        traceless.
+    tol : float, optional
+        The tolerance used to compare distances between orbitals. Default
+        is 1e-10.
+
+    Returns
+    -------
+    Basis
+        The Basis of OperatorStrings.
+
+    Examples
+    --------
+    To construct all possible (traceless) 1 and 2-site operators 
+    made of nearest and next-nearest neighbor Pauli strings on 
+    a periodic chain of twelve sites, one can use
+        >>> lattice = qosy.chain_lattice(12, periodic=True)
+        >>> basis   = distance_basis(lattice, 2, 2.0, 'Pauli')
+    """
+
+    # Store the distances between the orbitals into a matrix.
+    num_orbitals = len(lattice)
+    distances    = np.zeros((num_orbitals, num_orbitals))
+    for ind1 in range(num_orbitals):
+        for ind2 in range(ind1+1,num_orbitals):
+            distances[ind1,ind2] = lattice.distance(ind1, ind2)
+            distances[ind2,ind1] = distances[ind1,ind2]
+
+    # For each orbital, compute which orbitals are within distance R.
+    orbitals_within_R = [[ind2 for ind2 in range(num_orbitals) if distances[ind1,ind2] <= R+tol and ind2 != ind1] for ind1 in range(num_orbitals)]
+
+    # The clusters are maximal cliques of the graph
+    # with orbitals as nodes and nodes marked as adjacent
+    # if they are within a distance R of each other
+    # in real space.
+    clusters = maximal_cliques(orbitals_within_R)
+
+    # Sort the clusters for consistency.
+    sorted_clusters = sorted(clusters, cmp=compare)
+    
     total_basis = Basis()
-    for cluster_labels in clusters:
+    for cluster_labels in sorted_clusters:
         total_basis += cluster_basis(k, cluster_labels, op_type)
-        #total_basis = total_basis + cluster_basis(k, cluster_labels, op_type)
         
     return total_basis
-"""
+
+def print_vectors(basis, vectors):
+    """Print in human-readable form the vectors
+    as Operators in the given Basis.
+    
+    Parameters
+    ----------
+    basis : Basis
+        The Basis of OperatorStrings that the vector
+        is represented in.
+    vectors : ndarray
+        The vectors to print.
+    """
+    
+    if len(basis) != int(vectors.shape[0]):
+        raise ValueError('Vectors are not of the right size {} to be in the basis of dimension {}'.format(vectors.shape, len(basis)))
+
+    num_vecs = int(vectors.shape[1])
+    
+    operators = [Operator(vectors[:,ind_vec], basis.op_strings) for ind_vec in range(num_vecs)]
+
+    ind_vec = 1
+    for operator in operators:
+        cleaned_operator = operator.remove_zeros()
+        print('vector {} = '.format(ind_vec))
+        print(cleaned_operator)
+        ind_vec += 1

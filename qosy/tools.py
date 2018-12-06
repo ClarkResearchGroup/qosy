@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+This module provides miscellaneous methods that are helpful
+throughout ``qosy``.
+"""
+
 import numpy as np
 import numpy.linalg as nla
 
@@ -80,7 +85,81 @@ def compare(labelsI, labelsJ):
         
     return 0 # labelsI == labelsJ
 
-def gram_schmidt(matrix, tol=1e-10):
+def maximal_cliques(adjacency_lists):
+    """Find the maximal cliques of an undirected graph.
+
+    Implementation of the Bron-Kerbosch algorithm described
+    on wikipedia: https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
+
+    Parameters
+    ----------
+    adjacency_lists : list of list of int
+        Specifies the neighbors of each node in the graph.
+
+    Returns
+    -------
+    list of list of int
+        The maximal cliques of the graph.
+
+    Notes
+    -----
+    The adjacency lists must be valid. If invalid,
+    might enter an infinite recursion.
+    
+    """
+
+    num_nodes = len(adjacency_lists)
+
+    adjacency_sets = [set(adj_list) for adj_list in adjacency_lists]
+    
+    degeneracies = [len(adj_list) for adj_list in adjacency_lists]
+    degeneracy_ordering = np.argsort(degeneracies)[::-1]
+
+    P = set(np.arange(num_nodes))
+    R = set()
+    X = set()
+
+    cliques = []
+
+    def BronKerbosch2(R, P, X):
+        #print('R={},P={},X={}'.format(R,P,X))
+        if len(P) == 0 and len(X) == 0:
+            cliques.append(list(R))
+            return R
+
+        PunionX = P.union(X)
+        u = next(iter(PunionX))
+        for v in set(P):
+            if v not in adjacency_sets[u]:
+                BronKerbosch2(R.union(set([v])), P.intersection(adjacency_sets[v]), X.intersection(adjacency_sets[v]))
+                P.remove(v)
+                X = X.union(set([v]))
+            
+    for v in degeneracy_ordering:
+        BronKerbosch2(R.union(set([v])), P.intersection(adjacency_sets[v]), X.intersection(adjacency_sets[v]))
+        P.remove(v)
+        X = X.union(set([v]))
+
+    return cliques
+
+def argsort(mylist):
+    """Returns the indices that sort a list.
+
+    Parameters
+    ----------
+    list of comparable objects
+        List to sort.
+
+    Returns
+    -------
+    list of int
+        The permutation that sorts the list.
+    """
+
+    # Based on https://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python
+    return sorted(range(len(mylist)), key=mylist.__getitem__)
+
+def gram_schmidt(matrix, tol=0.0):
     """Perform Gram-Schmidt decomposition.
 
     Parameters
@@ -88,6 +167,10 @@ def gram_schmidt(matrix, tol=1e-10):
     matrix : ndarray or scipy.sparse matrix
         A matrix whose columns we want to orthogonalize
         going from left to right.
+    tol : float, optional
+        Specifies the tolerance used in the algorithm for
+        discarding vector which are not orthogonal. Defaults to
+        zero, in which case vectors are not discarded.
 
     Returns
     -------
@@ -98,27 +181,31 @@ def gram_schmidt(matrix, tol=1e-10):
         the given matrix if the given matrix is noninvertible.
     """
     
-    newMatrix = np.copy(matrix)
+    new_matrix = np.copy(matrix)
     n = int(matrix.shape[0])
     k = int(matrix.shape[1])
 
+    if n==0 or k==0:
+        return new_matrix
+
     shift = 0
-    newMatrix[:,0] = matrix[:,0] / nla.norm(matrix[:,0])
+    new_matrix[:,0] = matrix[:,0] / nla.norm(matrix[:,0])
     
     for indColUnshifted in range(1,k):
         indCol = indColUnshifted - shift
-        newMatrix[:,indCol] = matrix[:,indColUnshifted]
+        new_matrix[:,indCol] = matrix[:,indColUnshifted]
         for indVec in range(indCol):
-            newMatrix[:,indCol] = newMatrix[:,indCol] - np.vdot(newMatrix[:,indCol], newMatrix[:,indVec]) * newMatrix[:,indVec]
+            new_matrix[:,indCol] = new_matrix[:,indCol] - np.vdot(new_matrix[:,indCol], new_matrix[:,indVec]) * new_matrix[:,indVec]
 
-        norm = nla.norm(newMatrix[:,indCol])
+        norm = nla.norm(new_matrix[:,indCol])
+        
         if norm > tol:
-            newMatrix[:,indCol] = newMatrix[:,indCol] / norm
+            new_matrix[:,indCol] = new_matrix[:,indCol] / norm
         else:
             # Found a column that is linearly dependent on the previously found ones.
             shift += 1
         
-    return newMatrix[:,0:(k-shift)]
+    return new_matrix[:,0:(k-shift)]
 
 def intersection(A, B, tol=1e-10):
     """Find the intersection of two vector spaces. 

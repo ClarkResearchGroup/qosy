@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+"""
+This module defines an OperatorString, which is the core object
+that is used for algebraic manipulations in ``qosy``.
+"""
+
 import numpy as np
 import itertools as it
 from .config import *
@@ -51,6 +56,7 @@ class OperatorString:
         Ex: 'X','Y', or 'Z' for Pauli strings.
     orbital_labels : list or ndarray of int
         A list or array of the (unique) integer label of each orbital.
+        *By convention, the labels must be provided in sorted order.*
     op_type : str
         Specifies the type of OperatorString considered: 'Pauli', 
         'Majorana', or 'Fermion'.

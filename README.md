@@ -1,4 +1,4 @@
-# Qosy: Quantum Operators from SYmmetries
+# QOSY: Quantum Operators from SYmmetries
 
 Qosy is a python package for constructing quantum operators with desired symmetry properties, which can include continuous or discrete symmetries. 
 
@@ -44,6 +44,12 @@ To generate the documentation on your machine, type
 ```
 cd qosy/doc
 make html
+```
+
+To view it, type
+
+```
+firefox _build/html/index.html
 ```
 
 <!--- TODO: Create a link to the documentation on github. -->

@@ -103,24 +103,36 @@ def test_operator_addition():
     assert(sum_bonds4 == sum_bonds5)
     assert(sum_bonds5 == sum_bonds6)
     
-"""
-TODO: equivalent test when properly setup.
 def test_distance_basis():
     N = 3
-    chain_lattice = qy.lattice.chain(N, boundary=('Open',))
 
-    # When 2*R+1 == N, then the cluster basis and distance basis should be the same.
+    # A periodic chain with one orbital per unit cell.
+    chain_lattice = qy.lattice.chain(N, periodic=True)
+
+    # When R == N-1, then the cluster basis and distance basis should be the same.
+    k = 2
+    R = N-1
+    distance_basis = qy.basis.distance_basis(chain_lattice, k, R, 'Pauli')
+
+    cluster_basis  = qy.basis.cluster_basis(k, np.arange(len(chain_lattice)), 'Pauli')
+
+    assert(set(distance_basis.op_strings) == set(cluster_basis.op_strings))
+
+    N = 8
+    
+    # An open chain with two orbitals per unit cell.
+    chain_lattice = qy.lattice.chain(N, ['A', 'B'], periodic=False)
+    
     k = 2
     R = 1
     distance_basis = qy.basis.distance_basis(chain_lattice, k, R, 'Pauli')
+    
+    intercell_clusters = [[site,site+1,site+2,site+3] for site in np.arange(0,2*N,2) if site+3 < 2*N]
+    expected_basis = Basis()
+    for cluster in intercell_clusters:
+        expected_basis += qy.basis.cluster_basis(k, cluster, 'Pauli')
+
 
     print(distance_basis)
-
-    print(chain_lattice.labels)
-
-    cluster_basis  = qy.basis.cluster_basis(k, chain_lattice.labels, 'Pauli')
-
-    print(cluster_basis)
-    
-    assert(set(distance_basis.op_strings) == set(cluster_basis.op_strings))
-"""
+    print(expected_basis)
+    assert(set(distance_basis.op_strings) == set(expected_basis.op_strings))

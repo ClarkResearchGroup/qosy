@@ -197,7 +197,7 @@ def test_symmetry_matrix_simple():
     permutation = np.array([1,0], dtype=int)
     P = qy.label_permutation(permutation)
 
-    sym_matrix          = qy.symmetry_matrix(P, basis).toarray()
+    sym_matrix          = qy.symmetry_matrix(basis, P).toarray()
     expected_sym_matrix = np.array([[0, 0, 0, 0], \
                                     [0, 0, 1, 0], \
                                     [0, 1, 0, 0], \

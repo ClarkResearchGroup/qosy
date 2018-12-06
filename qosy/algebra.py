@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+"""
+This module provides methods for performing algebraic manipulations
+of OperatorStrings, such as taking products, commutators, and anticommutators,
+and computing structure constants. It also provides a method for
+computing the effect of commuting (or anti-commuting) an Operator
+on a Basis of OperatorStrings.
+"""
+
 import numpy as np
 import scipy.sparse as ss
 
@@ -265,7 +273,6 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
         
     result = []
     for (inds_os_C, inds_os_A, data) in matrix_data:
-        print(inds_os_C, inds_os_A, data)
         s_constants_B = ss.csc_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
         result.append(s_constants_B)
 
@@ -322,9 +329,9 @@ def commutant_matrix(basis, operator, operation_mode='commutator'):
     
     (s_constants, extended_basis) = structure_constants(basis, operator._basis, operation_mode=operation_mode, return_extended_basis=True)
 
-    commutant_matrix = ss.csc_matrix(dtype=complex, shape=(len(basis), len(extended_basis)))
+    commutant_matrix = ss.csc_matrix((len(extended_basis), len(basis)), dtype=complex)
 
-    for ind_os in range(len(operator_basis)):
+    for ind_os in range(len(operator._basis)):
         commutant_matrix += operator.coeffs[ind_os] * s_constants[ind_os]
 
     return commutant_matrix

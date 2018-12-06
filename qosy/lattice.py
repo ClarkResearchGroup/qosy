@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+"""
+This module defines Unit Cell and Lattice classes that
+conveniently handle the indexing of orbitals in a crystalline 
+lattice of atoms.
+"""
+
 import itertools as it
 import numpy as np
 import matplotlib.pyplot as plt
@@ -144,11 +150,11 @@ class Lattice:
             The closest distance between the first and second orbital.
         """
 
-        (pos1, orbital_name1) = self._orbitals[index1]
-        (pos2, orbital_name2) = self._orbitals[index2]
+        (pos1, orbital_name1, cell_coords1) = self._orbitals[index1]
+        (pos2, orbital_name2, cell_coords2) = self._orbitals[index2]
         
         mirror_distances = [np.linalg.norm((pos1+bv)-pos2) for bv in self._boundary_vectors]
-        return np.minimum(mirror_distances)
+        return np.min(mirror_distances)
     
     def __iter__(self):
         """Return an iterator over the positions, the names,
@@ -165,6 +171,12 @@ class Lattice:
         """
         
         return iter(self._orbitals)
+
+    def __len__(self):
+        """Return the number of orbitals in the Lattice.
+        """
+        
+        return len(self._orbitals)
                             
     def __str__(self):
         """Convert Lattice to a python string representation.

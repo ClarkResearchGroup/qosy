@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+"""
+This module includes a Transformation object that represents
+a discrete transformation, such as charge-conjugation or a
+space group symmetry, and a method for computing the effect
+of Transformation on a Basis of OperatorStrings.
+"""
+
 import numpy as np
 import scipy.sparse as ss
 
@@ -378,7 +385,7 @@ def charge_conjugation(sign=1.0):
     
     return particle_hole(sign)
 
-def symmetry_matrix(transformation, basis, tol=1e-12):
+def symmetry_matrix(basis, transformation, tol=1e-12):
     """Create the symmetry matrix that represents the
     effect of the transformation on the basis of 
     OperatorStrings.
@@ -391,12 +398,12 @@ def symmetry_matrix(transformation, basis, tol=1e-12):
 
     Parameters
     ----------
-    transformation : Transformation
-        The Transformation to perform 
-        on the OperatorStrings.
     basis : Basis
         The Basis of OperatorStrings used to
         represent the symmetry matrix.
+    transformation : Transformation
+        The Transformation to perform 
+        on the OperatorStrings.
     
     Returns
     -------

@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+"""
+This module provides functions for converting between different
+types of OperatorStrings. 
+
+Note
+----
+Currently, this module only supports the conversion between strings 
+of fermions and strings of Majorana fermions.
+"""
+
 import itertools as it
 import numpy as np
 import scipy.sparse as ss

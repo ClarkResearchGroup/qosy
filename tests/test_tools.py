@@ -27,13 +27,25 @@ def test_compare():
     assert(qy.tools.compare((0,1), (0,)) > 0)
     assert(qy.tools.compare((0,1), (0,1)) == 0)
     assert(qy.tools.compare((0,1), (1,0)) < 0)
+
+def test_maximal_cliques():
+    # Toy graph on https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
+    adjacency_lists = [[1,4], [0,2,4], [1,3], [2,4,5], [0,1,3], [3]]
     
+    maximal_cliques = qy.tools.maximal_cliques(adjacency_lists)
+
+    maximal_cliques_set = set([tuple(clique) for clique in maximal_cliques])
+    
+    expected_maximal_cliques_set = set([(0,1,4), (1,2), (2,3), (3,4), (3,5)])
+    
+    assert(maximal_cliques_set == expected_maximal_cliques_set)
+                              
 def test_gram_schmidt():
     # Do a simple check by hand.
     matrix = np.array([[1., 1.,  2.],\
                        [0., 1., -2.]])
 
-    vecs = qy.tools.gram_schmidt(matrix)
+    vecs = qy.tools.gram_schmidt(matrix, tol=1e-12)
     expected_vecs = np.array([[1., 0.],\
                               [0., 1.]])
 
@@ -42,7 +54,7 @@ def test_gram_schmidt():
     matrix = np.array([[1., 1.,  2.],\
                        [1., 0., -2.]])
 
-    vecs = qy.tools.gram_schmidt(matrix)
+    vecs = qy.tools.gram_schmidt(matrix, tol=1e-12)
     expected_vecs = 1./np.sqrt(2.)*np.array([[1.,  1.],\
                                              [1., -1.]])
 
