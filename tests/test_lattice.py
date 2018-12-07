@@ -8,7 +8,7 @@ def test_chain_lattice():
     expected_orbital_names  = ['A', 'B']*N
     expected_atom_positions = [np.zeros(1), np.zeros(1)]*N
 
-    expected_orbitals = zip(expected_atom_positions, expected_orbital_names)
+    expected_orbitals = list(zip(expected_atom_positions, expected_orbital_names))
     
     assert(len(chain_lattice._orbitals) == len(expected_orbitals))
     

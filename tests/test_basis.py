@@ -56,6 +56,21 @@ def test_cluster_basis():
      qy.opstring('CDag 1 CDag 2 C 2'), qy.opstring('1j CDag 1 CDag 2 C 2')]
 
     assert(set(basis.op_strings) == set(expected_op_strings))
+
+    k = [2]
+    cluster_labels = [1,2]
+    basis = qy.cluster_basis(k, cluster_labels, 'Pauli')
+
+    expected_op_strings =  \
+    [OperatorString(['X','X'], [1,2], 'Pauli'), OperatorString(['X','Y'], [1,2], 'Pauli'), \
+     OperatorString(['X','Z'], [1,2], 'Pauli'), OperatorString(['Y','Y'], [1,2], 'Pauli'), \
+     OperatorString(['Y','Z'], [1,2], 'Pauli'), OperatorString(['Z','Z'], [1,2], 'Pauli'), \
+     OperatorString(['Y','X'], [1,2], 'Pauli'), \
+     OperatorString(['Z','X'], [1,2], 'Pauli'), \
+     OperatorString(['Z','Y'], [1,2], 'Pauli'), \
+    ]
+    
+    assert(set(basis.op_strings) == set(expected_op_strings))
     
 def test_basis_addition():
     k = 2

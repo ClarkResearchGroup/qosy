@@ -18,7 +18,7 @@ import copy
 
 from .config import *
 from .operatorstring import OperatorString
-from .tools import maximal_cliques, compare
+from .tools import maximal_cliques, compare, cmp_to_key
 
 class Basis:
     """A Basis object represents a basis of operators
@@ -697,9 +697,11 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
 
     Parameters
     ----------
-    k : int
-        Specifies the maximum number of non-identity orbital operators
-        in the OperatorStrings in this Basis.
+    k : int or list or ndarray of int
+        Specifies the allowed support of OperatorStrings in the
+        Basis. If k is an integer, then OperatorStrings can have 
+        support up to k. If a list or array, then OperatorStrings
+        can only have support on the given numbers of orbitals.
     cluster_labels : list or ndarray of int
         The integer labels of the orbitals that are in the cluster.
     include_identity : bool, optional
@@ -714,9 +716,11 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
 
     Examples
     --------
-    To construct all possible (traceless) 1 and 2-site operators 
+    To construct all possible (traceless) one and two-site operators 
     made of Pauli strings on sites 1, 2, and 4, one can use
         >>> basis1 = qosy.cluster_basis(2, [1,2,4], 'Pauli')
+    To construct `only` two-site operators on these orbitals, one can use
+        >>> basis2 = qosy.cluster_basis([2], [1,2,4], 'Pauli')
     """
     
     # The labels of the cluster in sorted order.
@@ -730,8 +734,15 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
         identity = OperatorString([], [], op_type) # Identity operator
         op_strings.append(identity)
         op_strings_set.add(identity)
-    
-    max_num_operators = np.minimum(len(cluster), k)
+
+    if type(k) is int:
+        allowed_num_operators = np.arange(k+1)
+    elif type(k) is list or isinstance(k, np.ndarray):
+        allowed_num_operators = np.array(k, dtype=int)
+    else:
+        raise ValueError('k={} must be an integer or a list or array of integers.'.format(k))
+        
+    max_num_operators = np.minimum(len(cluster), np.max(allowed_num_operators))
 
     if op_type == 'Pauli' or op_type == 'Majorana':
         orbital_ops = PAULI_OPS
@@ -739,6 +750,9 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
             orbital_ops = MAJORANA_OPS
         
         for num_operators in np.arange(1,max_num_operators+1):
+            if num_operators not in allowed_num_operators:
+                continue
+            
             possible_ops    = list(it.product(orbital_ops, repeat=num_operators))
             possible_labels = list(it.combinations(cluster, num_operators))
             
@@ -750,6 +764,9 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
                         op_strings_set.add(op_string)
     elif op_type == 'Fermion':
         for num_operators_forward in np.arange(1,max_num_operators+1):
+            if num_operators_forward not in allowed_num_operators:
+                continue
+            
             possible_labels_forward = list(it.combinations(cluster, num_operators_forward))
             
             # Operator of type 1: c^\dagger_{i_1} ... c^\dagger_{i_m} c_{i_m} ... c_{i_1}
@@ -803,10 +820,11 @@ def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
     ----------
     lattice : Lattice
         The Lattice whose orbitals we want to use in this basis.
-    k : int
-        Specifies the maximum number of non-identity orbital operators
-        in the OperatorStrings in this Basis.
-    R : float
+    k : int or list or ndarray of int
+        Specifies the allowed support of OperatorStrings in the
+        Basis. If k is an integer, then OperatorStrings can have 
+        support up to k. If a list or array, then OperatorStrings
+        can only have support on the given numbers of orbitals.    R : float
         The maximum spatial distance between orbitals in an OperatorString.
     include_identity : bool, optional
         Specifies whether to include the identity operator in the Basis.
@@ -848,7 +866,7 @@ def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
     clusters = maximal_cliques(orbitals_within_R)
 
     # Sort the clusters for consistency.
-    sorted_clusters = sorted(clusters, cmp=compare)
+    sorted_clusters = sorted(clusters, key=cmp_to_key(compare))
     
     total_basis = Basis()
     for cluster_labels in sorted_clusters:

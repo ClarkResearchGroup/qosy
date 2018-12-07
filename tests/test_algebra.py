@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from .context import qosy as qy
-from helper import _random_op_string
+from .helper import _random_op_string
 import numpy as np
 
 def test_product_pauli():
