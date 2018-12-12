@@ -7,11 +7,12 @@ of Transformation on a Basis of OperatorStrings.
 """
 
 import numpy as np
+import numpy.linalg as nla
 import scipy.sparse as ss
 
 from .tools import sort_sign
 from .operatorstring import OperatorString
-from .basis import Operator
+from .basis import Basis, Operator
 
 class Transformation:
     """A Transformation object represents a 
@@ -385,32 +386,10 @@ def charge_conjugation(sign=1.0):
     
     return particle_hole(sign)
 
-def symmetry_matrix(basis, transformation, tol=1e-12):
-    """Create the symmetry matrix that represents the
-    effect of the transformation on the basis of 
-    OperatorStrings.
-
-    For a unitary (or antiunitary) transformation
-    operator :math:`\hat{\mathcal{U}}` and a basis 
-    of operator strings :math:`\hat{h}_a`,
-    the symmetry matrix :math:`M` is defined through
-        :math:`\hat{\mathcal{U}} \hat{h}_a \hat{\mathcal{U}}^{-1} = \sum_b M_{ba} \hat{h}_b`
-
-    Parameters
-    ----------
-    basis : Basis
-        The Basis of OperatorStrings used to
-        represent the symmetry matrix.
-    transformation : Transformation
-        The Transformation to perform 
-        on the OperatorStrings.
-    
-    Returns
-    -------
-    scipy.sparse.csc_matrix of complex
-        A sparse, not-necessarily-unitary complex matrix.
+def _symmetry_matrix_opstrings(basis, transformation, tol=1e-12):
+    """Compute the symmetry matrix for a Basis of OperatorStrings.
     """
-
+    
     dim_basis = len(basis)
 
     row_inds = []
@@ -439,3 +418,80 @@ def symmetry_matrix(basis, transformation, tol=1e-12):
     symmetry_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(dim_basis, dim_basis))
             
     return symmetry_matrix
+
+def _symmetry_matrix_operators(operators, transformation, tol=1e-12):
+    """Compute the symmetry matrix for a list of Operators that specify a "basis".
+    """
+    
+    # Assemble the combined Basis of all the OperatorStrings
+    # in the list of Operators.
+    operators_basis = Basis()
+    for op in operators:
+        operators_basis += op._basis
+
+    num_operators = len(operators)
+    dim_basis     = len(operators_basis)
+
+    # TODO: compute the correct combined symmetry matrix for the Operators list basis...
+    # Create a conversion matrix from the Basis
+    # of OperatorStrings to the list of Operators.
+    data     = []
+    row_inds = []
+    col_inds = []
+    for ind_op in range(num_operators):
+        for (coeff, os) in operators[ind_op]:
+            data.append(coeff)
+            row_inds.append(operators_basis.index(os))
+            col_inds.append(ind_op)
+    coeffs_operators = ss.csc_matrix((data, (row_inds, col_inds)), shape=(dim_basis, num_operators), dtype=complex)
+
+    print('coeffs_operators=\n{}'.format(coeffs_operators.toarray()))
+    
+    # Calculate the Moore-Penrose pseudo-inverse using numpy.
+    pinv_operators = ss.csc_matrix(nla.pinv(coeffs_operators.toarray()))
+
+    # Compute the projector C * C+ onto the Operators list "basis".
+    #projector_operators = coeffs_operators.dot(pinv_operators)
+
+    print('pinv_operators=\n{}'.format(pinv_operators.toarray()))
+    
+    # Assemble the symmetry matrix in the combined Basis of OperatorStrings.
+    symmetry_matrix_opstrings = _symmetry_matrix_opstrings(operators_basis, transformation, tol)
+
+    # Project this symmetry matrix into the list of Operators "basis".
+    symmetry_matrix_operators = (pinv_operators).dot(symmetry_matrix_opstrings.dot(coeffs_operators))
+    
+    return symmetry_matrix_operators
+
+def symmetry_matrix(basis, transformation, tol=1e-12):
+    """Create the symmetry matrix that represents the
+    effect of the transformation on the basis of 
+    OperatorStrings.
+
+    For a unitary (or antiunitary) transformation
+    operator :math:`\hat{\mathcal{U}}` and a basis 
+    of operator strings :math:`\hat{h}_a`,
+    the symmetry matrix :math:`M` is defined through
+        :math:`\hat{\mathcal{U}} \hat{h}_a \hat{\mathcal{U}}^{-1} = \sum_b M_{ba} \hat{h}_b`
+
+    Parameters
+    ----------
+    basis : Basis
+        The Basis of OperatorStrings used to
+        represent the symmetry matrix.
+    transformation : Transformation
+        The Transformation to perform 
+        on the OperatorStrings.
+    
+    Returns
+    -------
+    scipy.sparse.csc_matrix of complex
+        A sparse, not-necessarily-unitary complex matrix.
+    """
+
+    if isinstance(basis, Basis):
+        return _symmetry_matrix_opstrings(basis, transformation, tol)
+    elif isinstance(basis, list) and isinstance(basis[0], Operator):
+        return _symmetry_matrix_operators(basis, transformation, tol)
+    else:
+        raise ValueError('Cannot find the symmetry matrix for a basis of type: {}'.format(type(basis)))

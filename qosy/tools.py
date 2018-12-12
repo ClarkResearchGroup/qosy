@@ -88,9 +88,6 @@ def compare(labelsI, labelsJ):
 def maximal_cliques(adjacency_lists):
     """Find the maximal cliques of an undirected graph.
 
-    Implementation of the Bron-Kerbosch algorithm described
-    on wikipedia: https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
-
     Parameters
     ----------
     adjacency_lists : list of list of int
@@ -108,6 +105,9 @@ def maximal_cliques(adjacency_lists):
     
     """
 
+    # Implementation of the Bron-Kerbosch algorithm described
+    # on wikipedia: https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
+    
     num_nodes = len(adjacency_lists)
 
     adjacency_sets = [set(adj_list) for adj_list in adjacency_lists]
@@ -161,8 +161,9 @@ def argsort(mylist):
 
 def cmp_to_key(mycmp):
     """Convert a cmp= function into a key= function.
+    """
 
-    From https://docs.python.org/3/howto/sorting.html#sortinghowto"""
+    # From https://docs.python.org/3/howto/sorting.html#sortinghowto
     class K:
         def __init__(self, obj, *args):
             self.obj = obj

@@ -14,7 +14,7 @@ from .tools import sort_sign
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
 
-def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12):
+def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12):
     """Performs a binary operation between two OperatorStrings h_a and h_b.
     
     operation_mode='commutator'     returns [h_a, h_b] = h_a * h_b - h_b * h_a
@@ -126,20 +126,46 @@ def _operation(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12)
     
     return (coeff, op_string_C)
 
-def product(op_string_A, op_string_B):
-    """Compute the product of two OperatorStrings.
+def _operation_operator(operatorA, operatorB, operation_mode='commutator'):
+    """Perform an algebraic binary operation between
+    two Operators.
+    """
+    
+    coeffs_of_opstrings = dict()
+    for (coeffA, op_string_A) in operatorA:
+        for (coeffB, op_string_B) in operatorB:
+            (coeffC, op_string) = _operation_opstring(op_string_A, op_string_B, operation_mode)
+            coeff = coeffA*coeffB*coeffC
+
+            if op_string in coeffs_of_opstrings:
+                coeffs_of_opstrings[op_string] += coeff
+            else:
+                coeffs_of_opstrings[op_string] = coeff
+
+    coeffs     = []
+    op_strings = []
+    for op_string in coeffs_of_opstrings:
+        coeff = coeffs_of_opstrings[op_string]
+        coeffs.append(coeff)
+        op_strings.append(op_string)
+
+    return Operator(coeffs, op_strings)
+    
+def product(op_A, op_B):
+    """Compute the product of two OperatorStrings or Operators.
 
     Parameters
     ----------
-    op_string_A : OperatorString
-        OperatorString :math:`\hat{h}_a`.
-    op_string_B : OperatorString
-        OperatorString :math:`\hat{h}_b`.
+    op_A : OperatorString or Operator
+        OperatorString :math:`\hat{h}_a` or Operator :math:`\hat{\mathcal{O}}_A`.
+    op_B : OperatorString or Operator
+        OperatorString :math:`\hat{h}_b` or Operator :math:`\hat{\mathcal{O}}_B`.
 
     Returns
     -------
-    Operator
-        Operator that represents the product :math:`\hat{h}_a \hat{h}_b`
+    (float, OperatorString) or Operator
+        Operator that represents the product :math:`\hat{h}_a \hat{h}_b` 
+        or :math:`\hat{\mathcal{O}}_A \hat{\mathcal{O}}_B`.
 
     Examples
     --------
@@ -147,23 +173,29 @@ def product(op_string_A, op_string_B):
         >>> YY = qosy.opstring('Y 1 Y 2')
         >>> qosy.product(XX, YY) # Z_1 Z_2
     """
-    
-    return _operation(op_string_A, op_string_B, operation_mode='product')
 
-def commutator(op_string_A, op_string_B):
-    """Compute the commutator of two OperatorStrings.
+    if isinstance(op_A, OperatorString) and isinstance(op_B, OperatorString):
+        return _operation_opstring(op_A, op_B, operation_mode='product')
+    elif isinstance(op_A, Operator) and isinstance(op_B, Operator):
+        return _operation_operator(op_A, op_B, operation_mode='product')
+    else:
+        raise ValueError()
+    
+def commutator(op_A, op_B):
+    """Compute the commutator of two OperatorStrings or Operators.
 
     Parameters
     ----------
-    op_string_A : OperatorString
-        OperatorString :math:`\hat{h}_a`.
-    op_string_B : OperatorString
-        OperatorString :math:`\hat{h}_b`.
+    op_A : OperatorString or Operator
+        OperatorString :math:`\hat{h}_a` or Operator :math:`\hat{\mathcal{O}}_A`.
+    op_B : OperatorString or Operator
+        OperatorString :math:`\hat{h}_b` or Operator :math:`\hat{\mathcal{O}}_B`.
 
     Returns
     -------
-    Operator
-        Operator that represents the commutator :math:`[\hat{h}_a, \hat{h}_b] = \hat{h}_a \hat{h}_b - \hat{h}_b \hat{h}_a`.
+    (float, OperatorString) or Operator
+        Operator that represents the commutator :math:`[\hat{h}_a, \hat{h}_b]` 
+        or :math:`[\hat{\mathcal{O}}_A, \hat{\mathcal{O}}_B]`.
 
     Examples
     --------
@@ -171,23 +203,29 @@ def commutator(op_string_A, op_string_B):
         >>> Y  = qosy.opstring('Y 1')
         >>> qosy.commutator(XX, Y) # 2i Z_1 X_2
     """
-    
-    return _operation(op_string_A, op_string_B, operation_mode='commutator')
 
-def anticommutator(op_string_A, op_string_B):
-    """Compute the anticommutator of two OperatorStrings.
+    if isinstance(op_A, OperatorString) and isinstance(op_B, OperatorString):
+        return _operation_opstring(op_A, op_B, operation_mode='commutator')
+    elif isinstance(op_A, Operator) and isinstance(op_B, Operator):
+        return _operation_operator(op_A, op_B, operation_mode='commutator')
+    else:
+        raise ValueError()
+
+def anticommutator(op_A, op_B):
+    """Compute the anticommutator of two OperatorStrings or Operators.
 
     Parameters
     ----------
-    op_string_A : OperatorString
-        OperatorString :math:`\hat{h}_a`.
-    op_string_B : OperatorString
-        OperatorString :math:`\hat{h}_b`.
-    
+    op_A : OperatorString or Operator
+        OperatorString :math:`\hat{h}_a` or Operator :math:`\hat{\mathcal{O}}_A`.
+    op_B : OperatorString or Operator
+        OperatorString :math:`\hat{h}_b` or Operator :math:`\hat{\mathcal{O}}_B`.
+
     Returns
     -------
-    Operator
-        Operator that represents the anticommutator :math:`\{\hat{h}_a, \hat{h}_b\} = \hat{h}_a \hat{h}_b + \hat{h}_b \hat{h}_a`.
+    (float, OperatorString) or Operator
+        Operator that represents the anticommutator :math:`\{\hat{h}_a, \hat{h}_b\}` 
+        or :math:`\{\hat{\mathcal{O}}_A, \hat{\mathcal{O}}_B\}`.
 
     Examples
     --------
@@ -195,9 +233,14 @@ def anticommutator(op_string_A, op_string_B):
         >>> YY = qosy.opstring('Y 1 Y 2')
         >>> qosy.anticommutator(XX, YY) # -2 Z_1 Z_2
     """
-    
-    return _operation(op_string_A, op_string_B, operation_mode='anticommutator')
 
+    if isinstance(op_A, OperatorString) and isinstance(op_B, OperatorString):
+        return _operation_opstring(op_A, op_B, operation_mode='anticommutator')
+    elif isinstance(op_A, Operator) and isinstance(op_B, Operator):
+        return _operation_operator(op_A, op_B, operation_mode='anticommutator')
+    else:
+        raise ValueError()
+    
 def structure_constants(basisA, basisB, operation_mode='commutator', return_extended_basis=False, tol=1e-12):
     """Compute the structure constants obtained by taking
     the commutator between OperatorStrings from two different
@@ -259,7 +302,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
         for ind_os_A in range(len(basisA)):
             os_A = basisA[ind_os_A]
             
-            (coeff, os_C) = _operation(os_A, os_B, operation_mode=operation_mode)
+            (coeff, os_C) = _operation_opstring(os_A, os_B, operation_mode=operation_mode)
 
             if np.abs(coeff) > tol:
                 basisC += os_C
@@ -288,6 +331,62 @@ def killing_form(basis):
     # TODO
 """
 
+def _commutant_matrix_opstrings(basis, operator, operation_mode):
+    """Compute the commutant matrix given a Basis of OperatorStrings.
+    """
+    
+    (s_constants, extended_basis) = structure_constants(basis, operator._basis, operation_mode=operation_mode, return_extended_basis=True)
+    
+    commutant_matrix = ss.csc_matrix((len(extended_basis), len(basis)), dtype=complex)
+    
+    for ind_os in range(len(operator._basis)):
+        commutant_matrix += operator.coeffs[ind_os] * s_constants[ind_os]
+
+    return commutant_matrix
+
+def _commutant_matrix_operators(operators, operator, operation_mode):
+    """Compute the commutant matrix corresponding to "basis"
+    made from a list of Operators.
+    """
+
+    # "operators" is a list of Operators O_a (that are by assumption
+    # linearly independent.)
+    #
+    # We use the O_a as a "basis" rather than the OperatorStrings h_a,
+    # but the actual calculations are done in terms of the h_a since
+    # we know the rules for how the h_a commute.
+
+    num_operators = len(operators)
+    
+    # Assemble a Basis of OperatorStrings that contains all of the
+    # OperatorStrings in the list of Operators O_a.
+    operators_basis = Basis()
+    for op in operators:
+        operators_basis += op._basis
+
+    # Compute the structure constants for the Basis.
+    (s_constants, extended_basis) = structure_constants(operators_basis, operator._basis, operation_mode=operation_mode, return_extended_basis=True)
+
+    # Create a conversion matrix from the Basis
+    # of OperatorStrings to the list of Operators.
+    data     = []
+    row_inds = []
+    col_inds = []
+    for ind_op in range(num_operators):
+        for (coeff, os) in operators[ind_op]:
+            data.append(coeff)
+            row_inds.append(operators_basis.index(os))
+            col_inds.append(ind_op)
+    coeffs_operators = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(operators_basis), num_operators), dtype=complex)
+
+    # Assemble the commutant matrix from the relevant structure constants
+    # and convert to the list of Operators "basis".
+    commutant_matrix = ss.csc_matrix((len(extended_basis), num_operators), dtype=complex)
+    for ind_os in range(len(operator._basis)):
+        commutant_matrix += operator.coeffs[ind_os] * s_constants[ind_os].dot(coeffs_operators)
+                
+    return commutant_matrix
+
 def commutant_matrix(basis, operator, operation_mode='commutator'):
     """Compute the commutant matrix that describes the effect
     of commuting with the given Operator :math:`\hat{\mathcal{O}}` 
@@ -302,8 +401,9 @@ def commutant_matrix(basis, operator, operation_mode='commutator'):
     
     Parameters
     ----------
-    basis : Basis
-        The Basis of OperatorStrings :math:`\hat{h}_a` to express the commutant matrix in.
+    basis : Basis or list of Operators
+        The Basis of OperatorStrings :math:`\hat{h}_a` or list of
+        Operators :math:`\hat{\mathcal{O}}_a` to express the commutant matrix in.
     operator : Operator
         The operator :math:`\hat{\mathcal{O}}`.
     
@@ -326,12 +426,9 @@ def commutant_matrix(basis, operator, operation_mode='commutator'):
         >>> bond = qosy.Operator(np.ones(3), [XX,YY,ZZ])
         >>> com_matrix = qosy.commutant_matrix(basis, bond)
     """
+
+    if isinstance(basis, Basis):
+        return _commutant_matrix_opstrings(basis, operator, operation_mode)
+    elif isinstance(basis, list) and isinstance(basis[0], Operator):
+        return _commutant_matrix_operators(basis, operator, operation_mode)
     
-    (s_constants, extended_basis) = structure_constants(basis, operator._basis, operation_mode=operation_mode, return_extended_basis=True)
-
-    commutant_matrix = ss.csc_matrix((len(extended_basis), len(basis)), dtype=complex)
-
-    for ind_os in range(len(operator._basis)):
-        commutant_matrix += operator.coeffs[ind_os] * s_constants[ind_os]
-
-    return commutant_matrix

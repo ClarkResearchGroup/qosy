@@ -200,3 +200,49 @@ def test_structure_constants_simple():
 
     assert(set(basisC.op_strings) == set(expected_basisC.op_strings))
 
+    
+def test_operator_operations():
+    
+    # Check the product, commutator, and anticommutator of Operators
+    # by hand for a simple example.
+
+    # Product example:
+    # (X_1 X_2 + Y_1 Y_2)*(X_1 + Y_1) = X_2 - i Z_1 Y_2 + i Z_1 X_2 + Y_2
+    coeffsA     = np.ones(2)
+    op_stringsA = [qy.opstring('X 1 X 2'), qy.opstring('Y 1 Y 2')]
+    
+    operatorA = qy.Operator(coeffsA, op_stringsA)
+    
+    coeffsB     = np.ones(2)
+    op_stringsB = [qy.opstring('X 1'), qy.opstring('Y 1')]
+    
+    operatorB = qy.Operator(coeffsB, op_stringsB)
+ 
+    expected_prodAB = qy.Operator(np.array([1.0, -1j, 1j, 1.0]), \
+                                  [qy.opstring('X 2'),     qy.opstring('Z 1 Y 2'), \
+                                   qy.opstring('Z 1 X 2'), qy.opstring('Y 2')])
+    
+    prodAB = qy.product(operatorA, operatorB)
+
+    assert((prodAB - expected_prodAB).norm() < 1e-12)
+
+    # Commutator example:
+    # [X_1 X_2 + Y_1 Y_2, X_1 + Y_1] = -2i Z_1 Y_2 + 2i Z_1 X_2
+    expected_comAB = qy.Operator(np.array([-2j, 2j]), \
+                                  [qy.opstring('Z 1 Y 2'), qy.opstring('Z 1 X 2')])
+    
+    comAB = qy.commutator(operatorA, operatorB)
+
+    assert((comAB - expected_comAB).norm() < 1e-12)
+
+    # Anticommutator example:
+    # {X_1 X_2 + Y_1 Y_2, X_1 + Y_1} = 2 X_2 + 2 Y_2
+    expected_anticomAB = qy.Operator(np.array([2, 2]), \
+                                  [qy.opstring('X 2'), qy.opstring('Y 2')])
+    
+    anticomAB = qy.anticommutator(operatorA, operatorB)
+
+    assert((anticomAB - expected_anticomAB).norm() < 1e-12)
+
+
+    

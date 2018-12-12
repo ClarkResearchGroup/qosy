@@ -11,6 +11,21 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
                 
 class UnitCell:
+    """A UnitCell object represents a unit cell of atoms
+    with orbitals on the atoms.
+
+    Attributes
+    ----------
+    lattice_vectors : list of ndarray
+        The primitive lattice vectors that indicate the
+        size of the unit cell. The vectors are stored in
+        the columns of this array.
+    atom_positions : list of ndarray
+        The positions of the atoms in the UnitCell.
+    atom_orbitals : list of list of hashable
+        The list of orbital names for each atom.
+    """
+    
     def __init__(self, lattice_vectors, atom_positions=None, atom_orbitals=None):
         self.lattice_vectors = lattice_vectors
 
@@ -25,6 +40,17 @@ class UnitCell:
             self.atom_orbitals = atom_orbitals
 
     def add_atom(self, position, orbitals=None):
+        """Add an atom to the UnitCell.
+
+        Parameters
+        ----------
+        position : ndarray, (d,)
+            The position of the atom in the UnitCell.
+        orbitals : list of hashable, optional
+            The names of the orbitals associated with the atom.
+            By default creates a single orbital with name ''.
+        """
+        
         self.atom_positions.append(position)
         
         if orbitals is None:
@@ -49,16 +75,21 @@ class Lattice:
         directions. True means periodic, False means open.
     dim : int
         The dimension d of the Lattice.
+    precision : float
+        The precision with which to consider atomic coordinates
+        equivalent.
     """
     
-    def __init__(self, unit_cell, num_cells, periodic_boundaries=None):
+    def __init__(self, unit_cell, num_cells, periodic_boundaries=None, precision=3):
         self.unit_cell = unit_cell
         self.num_cells = num_cells
+
+        self.precision = precision
 
         # A list of tuples of the positions, orbital names, and unit cell coordinates
         # of each orbital:
         # Ex: [(array([0,0]), 'A', (0,0)), (array([0,0]), 'B', (0,0)), (array([2,0]), 'A', (1,0)), ...]
-        self._orbitals         = []
+        self._orbitals = []
         
         # Dictionary that maps tuples of position (as strings) and orbital names to
         # the index in the self._orbitals list.
@@ -83,7 +114,7 @@ class Lattice:
                 for ind_vec in range(self.dim):
                     pos += coords_cell[ind_vec] * unit_cell.lattice_vectors[ind_vec]
                 pos += pos_atom
-                pos_name = np.array2string(pos.flatten(), precision=8)
+                pos_name = np.array2string(pos.flatten(), precision=self.precision)
 
                 for orbital_name in orbitals_atom:
                     ind_orbital = len(self._orbitals)
@@ -128,10 +159,11 @@ class Lattice:
         # zero vector, which corresponds to no translation.
         for boundary_vector in self._boundary_vectors:
             pos      = position + boundary_vector
-            pos_name = np.array2string(pos.flatten(), precision=8)
+            pos_name = np.array2string(pos.flatten(), precision=self.precision)
+            
             if (pos_name, orbital_name) in self._indices_orbitals:
-                return self._indices_orbitals[(pos_name, orbital_name)]
-
+                return self._indices_orbitals[(pos_name, orbital_name)] 
+            
         return -1
         
     def distance(self, index1, index2):
@@ -219,99 +251,114 @@ def plot(lattice, with_labels=False):
        >>> qosy.plot(lattice)
        >>> qosy.show()
     """
-
-    # How much space to separate the orbitals
-    # on the same atom in the plot.
-    intra_atom_spacing = 0.1*np.min([np.linalg.norm(vec) for vec in lattice.unit_cell.lattice_vectors])
     
     if lattice.dim == 1:
         # Plot the first unit cell separately.
         x_uc = []
         y_uc = []
-        names = []
-        for (position, orbital_names) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
-            intra_atom_shifts = intra_atom_spacing * np.linspace(-1.0, 1.0, len(orbital_names))
-            for ind_shift in range(len(orbital_names)):
-                x_uc.append(position[0])
-                y_uc.append(intra_atom_shifts[ind_shift])
-                names.append(orbital_names[ind_shift])
+        for position in lattice.unit_cell.atom_positions:
+            x_uc.append(position[0])
+            y_uc.append(0.0)
 
-        if with_labels:
-            for (x,y,name) in zip(x_uc,y_uc,names):
-                plt.annotate(name, xy=(x,y), color='r')
-        else:        
-            plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10)
+        plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
 
         xs = []
         ys = []
+        names = []
+        label = 0
         for (position, orbital_name, cell_coords) in lattice:
             xs.append(position[0])
             ys.append(0.0)
-
+            names.append('{}'.format(label))
+            label += 1
+            
         plt.plot(xs, ys, 'ko', markeredgecolor='k', markersize=8)
+
+        if with_labels:
+            for (x,y,name) in zip(xs,ys,names):
+                plt.annotate(name, xy=(x,y), color='b')
 
         plt.xlim(np.min(xs)-1, np.max(xs)+1)
         plt.ylim(-1,1)
-        
+
+        plt.xlabel('$x$')
         plt.axis('equal')
                 
     elif lattice.dim == 2:
         # Plot the first unit cell separately.
         x_uc = []
         y_uc = []
-        names = []
-        for (position, orbital_names) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
-            thetas = 2.0*np.pi*np.arange(len(orbital_names))/float(len(orbital_names))
-            for (theta, name) in zip(thetas, orbital_names):
-                x_uc.append(position[0] + intra_atom_spacing*np.cos(theta))
-                y_uc.append(position[1] + intra_atom_spacing*np.sin(theta))
-                names.append(name)
-                
-        if with_labels:
-            for (x,y,name) in zip(x_uc,y_uc,names):
-                plt.annotate(name, xy=(x,y), color='r')
-        else:
-            plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10)
+        for position in lattice.unit_cell.atom_positions:
+            x_uc.append(position[0])
+            y_uc.append(position[1])
+    
+        plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
                 
         xs = []
         ys = []
+        names = []
+        label = 0
         for (position, orbital_name, cell_coords) in lattice:
             xs.append(position[0])
             ys.append(position[1])
-
+            names.append('{}'.format(label))
+            label += 1
+            
         plt.plot(xs, ys, 'ko', markeredgecolor='k', markersize=8)
 
+        if with_labels:
+            for (x,y,name) in zip(xs,ys,names):
+                plt.annotate(name, xy=(x,y), color='b')
+        
         plt.xlim(np.min(xs)-1, np.max(xs)+1)
         plt.xlim(np.min(ys)-1, np.max(ys)+1)
 
+
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
         plt.axis('equal')
         
     elif lattice.dim == 3:
+        fig = plt.gcf()
+        ax  = fig.add_subplot(111, projection='3d')
+        
         # Plot the first unit cell separately.
         x_uc = []
         y_uc = []
         z_uc = []
-        for (position, orbital_names) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
-            thetas = 2.0*np.pi*np.arange(len(orbital_names))/float(len(orbital_names))
-            for theta in thetas:
-                x_uc.append(position[0] + intra_atom_spacing*np.cos(theta))
-                y_uc.append(position[1] + intra_atom_spacing*np.sin(theta))
-                z_uc.append(position[2])
+        for position in lattice.unit_cell.atom_positions:
+            x_uc.append(position[0])
+            y_uc.append(position[1])
+            z_uc.append(position[2])
 
-        ax.scatter(x_uc, y_uc, z_uc, 'rs', markeredgecolor='r', markersize=10)
+        ax.scatter(x_uc, y_uc, z_uc, c='r', marker='s')
 
         xs = []
         ys = []
         zs = []
+        names = []
+        label = 0
         for (position, orbital_name, cell_coords) in lattice:
             xs.append(position[0])
             ys.append(position[1])
             zs.append(position[2])
-
-        ax.scatter(xs, ys, zs, 'ko', markeredgecolor='k', markersize=8)
+            names.append(str(label))
+            label += 1
+            
+        ax.scatter(xs, ys, zs, c='k', marker='o')
+        ax.set_xlabel('$x$')
+        ax.set_ylabel('$y$')
+        ax.set_zlabel('$z$')
         
         if with_labels:
-            raise NotImplementedError('Plotting the labels is not supported in 3D.')
+            label = 0
+            for (pos_atom, orbitals_atom) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
+                labels_atom = []
+                for orbital in orbitals_atom:
+                    labels_atom.append(label)
+                    label += 1
+                
+                ax.text(pos_atom[0], pos_atom[1], pos_atom[2], str(labels_atom), size=20, zorder=1)
     else:
         raise ValueError('Cannot plot a {}-dimensional lattice.'.format(lattice.dim))
     
@@ -398,8 +445,6 @@ def kagome(N1, N2, periodic_boundaries=None):
     a2 = a * np.array([1.0/2.0, np.sqrt(3.0)/2.0])
     lattice_vectors = [a1, a2]
     
-    # Labels of the three sites in the unit cell.
-    labels = ['A','B','C']
     # positions of the three sites in the unit cell.
     r1 = np.zeros(2)
     r2 = a1 / 2.0
@@ -408,10 +453,17 @@ def kagome(N1, N2, periodic_boundaries=None):
 
     # Construct the unit cell.
     unit_cell = UnitCell(lattice_vectors)
-    for (atom_position, orbital_name) in zip(positions, labels):
-        unit_cell.add_atom(atom_position, [orbital_name])
+    for atom_position in positions:
+        unit_cell.add_atom(atom_position)
     
     # Construct the lattice.
     lattice = Lattice(unit_cell, (N1,N2), periodic_boundaries=periodic_boundaries)
 
     return lattice
+
+# TODO
+#def symmetrize(unit_cell, space_group_symmetries):
+    # Construct a new, larger unit cell with the given
+    # space group symmetries.
+
+    

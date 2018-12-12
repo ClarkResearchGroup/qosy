@@ -190,6 +190,8 @@ def test_transformation_product():
     assert((operator - expected_operator).norm() < 1e-12)
     
 def test_symmetry_matrix_simple():
+    # Test the symmetry matrix using a Basis of OperatorStrings.
+    
     op_strings = [qy.opstring('X 0 Y 1'), qy.opstring('X 0'), qy.opstring('X 1'), qy.opstring('X 0 X 1')]
     basis      = qy.Basis(op_strings)
 
@@ -203,4 +205,30 @@ def test_symmetry_matrix_simple():
                                     [0, 1, 0, 0], \
                                     [0, 0, 0, 1]],dtype=complex)
 
+    assert(np.linalg.norm(sym_matrix - expected_sym_matrix) < 1e-12)
+
+def test_symmetry_matrix_operators_simple():
+    # Test the symmetry matrix using a list of Operators as a "basis."
+
+    operator1 = qy.Operator([1,1],  [qy.opstring('X 0'), qy.opstring('X 1')])
+    operator2 = qy.Operator([1],    [qy.opstring('X 0 X 1')])
+    operator3 = qy.Operator([1,-1], [qy.opstring('Y 0'), qy.opstring('Y 1')])
+    operator4 = qy.Operator([1],    [qy.opstring('Z 0')])
+    operator5 = qy.Operator([1],    [qy.opstring('Z 1')])
+    
+    operators = [operator1, operator2, operator3, operator4, operator5]
+
+    # Swap labels 0 and 1
+    permutation = np.array([1,0], dtype=int)
+    P = qy.label_permutation(permutation)
+
+    sym_matrix          = qy.symmetry_matrix(operators, P).toarray()
+    expected_sym_matrix = np.array([[1, 0,  0, 0, 0], \
+                                    [0, 1,  0, 0, 0], \
+                                    [0, 0, -1, 0, 0], \
+                                    [0, 0,  0, 0, 1], \
+                                    [0, 0,  0, 1, 0]],dtype=complex)
+
+    print(sym_matrix)
+    print(expected_sym_matrix)
     assert(np.linalg.norm(sym_matrix - expected_sym_matrix) < 1e-12)

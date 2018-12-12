@@ -40,8 +40,9 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_com
 
     Parameters
     ----------
-    basis : Basis
-        The Basis of OperatorStrings :math:`\hat{h}_a` to search in.
+    basis : Basis or list of Operators
+        The Basis of OperatorStrings :math:`\hat{h}_a` or list 
+        of Operators :math:`\hat{\mathcal{O}}_a` to search in.
     operator : Operator
         The Operator :math:`\hat{\mathcal{O}}` to commute (or 
         anti-commute) with.
@@ -109,8 +110,9 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
 
     Parameters
     ----------
-    basis : Basis
-        The Basis of OperatorStrings :math:`\hat{h}_a` to search in.
+    basis : Basis or list of Operators
+        The Basis of OperatorStrings :math:`\hat{h}_a` or list 
+        of Operators :math:`\hat{\mathcal{O}}_a` to search in.
     transform : Transformation
         The Transformation :math:`\hat{\mathcal{U}}` to commute (or 
         anti-commute) with.
@@ -180,8 +182,9 @@ class SymmetricOperatorGenerator:
 
     Attributes
     ----------
-    basis : Basis
-        The Basis of OperatorStrings to search for symmetric operators in.
+    basis : Basis or list of Operators
+        The Basis of OperatorStrings or list of Operators to 
+        search for symmetric operators in.
     input_symmetries : list of Operators and Transformations
         A list of Hermitian Operators or symmetry Transformations
         that we want to commute (or anti-commute) with our output operators.

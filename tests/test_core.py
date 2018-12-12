@@ -39,7 +39,52 @@ def test_disordered_heisenberg():
         
         overlaps = np.dot(np.conj(generators.T), commuting_ops)
         
-        (eigvecs, eigvals) = nla.eigh(overlaps)
+        (eigvals, eigvecs) = nla.eigh(overlaps)
+        inds_null_space    = np.where(np.abs(eigvals) < 1e-12)[0]
+
+        assert(len(inds_null_space) == 0)
+
+def test_disordered_heisenberg_operators():
+    # Same as test_disordered_heisenberg, but using a list of Operators
+    # as a "basis" instead of a Basis of OperatorStrings.
+
+    N = 6
+    # Use a basis of one-site operators.
+    basis = qy.cluster_basis(1, np.arange(N), 'Pauli')
+
+    # These are my operators O_1, O_2, O_3, O_4,
+    # which form my list of Operators that I will use as a basis.
+    totalX = qy.Operator(np.ones(N), [qy.opstring('X {}'.format(site)) for site in range(N)])
+    totalY = qy.Operator(np.ones(N), [qy.opstring('Y {}'.format(site)) for site in range(N)])
+    totalZ = qy.Operator(np.ones(N), [qy.opstring('Z {}'.format(site)) for site in range(N)])
+    random_op = qy.Operator([1.0], [qy.opstring('X 0 Z {}'.format(N-1))]) # An extra unnecessary operator
+
+    operators = [totalX, totalY, totalZ, random_op]
+
+    # In the list of operators "basis", the expected answers
+    # are the unit vectors [1,0,0], [0,1,0], and [0,0,1].
+    expected_commuting_ops = np.zeros((len(operators),3), dtype=complex)
+    expected_commuting_ops[0:3,0:3] = np.eye(3)
+    
+    np.random.seed(42)
+    num_trials = 10
+    for ind_trial in range(num_trials):
+        heisenberg_model = qy.Operator(op_type='Pauli')
+        for site1 in range(N):
+            for site2 in range(site1+1,N):
+                bond_coeffs = (2.0*np.random.rand() - 1.0) * np.ones(3)
+                bond_ops    = [qy.opstring('X {} X {}'.format(site1,site2)), \
+                               qy.opstring('Y {} Y {}'.format(site1,site2)), \
+                               qy.opstring('Z {} Z {}'.format(site1,site2))]
+                heisenberg_model += qy.Operator(bond_coeffs, bond_ops)
+
+        commuting_ops = qy.commuting_operators(operators, heisenberg_model)
+        
+        assert(int(commuting_ops.shape[1]) == 3)
+        
+        overlaps = np.dot(np.conj(expected_commuting_ops.T), commuting_ops)
+        
+        (eigvals, eigvecs) = nla.eigh(overlaps)
         inds_null_space    = np.where(np.abs(eigvals) < 1e-12)[0]
 
         assert(len(inds_null_space) == 0)
@@ -73,7 +118,7 @@ def test_translation_invariance_chain():
         
     overlaps = np.dot(np.conj(generators.T), invariant_ops)
     
-    (eigvecs, eigvals) = nla.eigh(overlaps)
+    (eigvals, eigvecs) = nla.eigh(overlaps)
     inds_null_space    = np.where(np.abs(eigvals) < 1e-12)[0]
     
     assert(len(inds_null_space) == 0)
@@ -118,7 +163,7 @@ def test_kitaev_chain_edge_modes():
     
     overlaps = np.dot(np.conj(expected_ops.T), commuting_ops)
     
-    (eigvecs, eigvals) = nla.eigh(overlaps)
+    (eigvals, eigvecs) = nla.eigh(overlaps)
     inds_null_space    = np.where(np.abs(eigvals) < 1e-12)[0]
 
     assert(len(inds_null_space) == 0)
