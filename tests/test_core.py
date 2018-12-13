@@ -268,14 +268,12 @@ def test_inverse_ssh_model_generation():
         assert(op_generator.output_operators[ind_output].shape[0] \
                == op_generator.projected_output_operators[ind_output].shape[0])
 
-        print(op_generator.projected_superoperators[ind_output].shape)
-        print(op_generator.projected_output_operators[ind_output].shape)
+        #print(op_generator.projected_superoperators[ind_output].shape)
+        #print(op_generator.projected_output_operators[ind_output].shape)
 
         if ind_output > 0:
-            # Projected superoperators have same size as the
-            # number of projected_output_operators from the previous iteration.
             assert(op_generator.projected_superoperators[ind_output].shape[0] \
-                   == op_generator.projected_output_operators[ind_output-1].shape[1])
+               == op_generator.projected_output_operators[ind_output].shape[1])
 
     ops = op_generator.projected_output_operators[-1]
 

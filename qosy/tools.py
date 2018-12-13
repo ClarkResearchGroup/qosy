@@ -296,15 +296,18 @@ def sparsify(vectors, orthogonalize=True, tol=1e-12):
         A matrix whose columns are the sparsified vectors.
     """
 
+    num_vectors = int(vectors.shape[1])
+    
+    if num_vectors <= 1:
+        return vectors
+    
     # Perform an LU decomposition, which
     # will do a reduced-row echelon form
     # decomposition. The L matrix corresponds
     # to a new set of vectors that are
     # sparser than the original (but, are
-    # certainly not optimally sparse).
+    # not guaranteed to be optimally sparse).
     (vectors_rre, _) = sla.lu(vectors, permute_l=True)
-
-    num_vectors = int(vectors_rre.shape[1])
 
     if orthogonalize:
         vectors_rre = gram_schmidt(vectors_rre[:, ::-1])

@@ -386,7 +386,10 @@ class SymmetricOperatorGenerator:
         # Project V_2 into V_1. Project V_3 into V_1 and V_2, etc.
         for ind_output in range(num_inputs):
             if ind_output == 0:
-                # Do not project the first iteration.
+                # NOTE: The convention is that there is no
+                # projection in the first iteration. The "projected_superoperator"
+                # and its eigenvalues/eigenvectors are the same as the unprojected
+                # one. TODO: This should probably be changed in the future.
                 self.projected_output_operators.append(self.output_operators[ind_output])
 
                 self.projected_superoperators.append(self.superoperators[ind_output])
@@ -399,14 +402,15 @@ class SymmetricOperatorGenerator:
                 
                 # The projected operators in the null space (or +/-1 eigenspace)
                 # can be found by taking intersections of vector spaces.
-                self.projected_output_operators.append(intersection(curr_ops, prev_ops))
-
+                proj_curr_ops = intersection(curr_ops, prev_ops)
+                self.projected_output_operators.append(proj_curr_ops)
+                
                 # Compute the projected superoperator and its eigenvalues and eigenvectors.
                 if self.num_vecs is not None:
                     # Using scipy.sparse.linalg.eigsh
                     
-                    prev_ops_sparse = ss.csc_matrix(prev_ops)
-                    projected_superoperator = ((prev_ops_sparse.H).dot(self.superoperators[ind_output])).dot(prev_ops_sparse)
+                    proj_curr_ops_sparse = ss.csc_matrix(proj_curr_ops)
+                    projected_superoperator = ((proj_curr_ops_sparse.H).dot(self.superoperators[ind_output])).dot(proj_currs_ops_sparse)
                     self.projected_superoperators.append(projected_superoperator)
 
                     sigma = -1e-2
@@ -418,19 +422,36 @@ class SymmetricOperatorGenerator:
 
                     (evalsPSO, evecsPSO) = ssla.eigsh(projected_superoperator, k=self.num_vecs, sigma=sigma)
                     self.projected_eigenvalues.append(evalsPSO)
-                    projected_evecs = np.dot(prev_ops, evecsPSO)
+                    projected_evecs = np.dot(proj_curr_ops, evecsPSO)
                     self.projected_eigenvectors.append(projected_evecs)
+
+                    if sigma not in [1.0, -1.0]:
+                        sigma = 0.0
+
+                    inds_sigma = np.where(np.abs(evalsPSO - sigma) < tol)[0]
+                    self.projected_output_operators[ind_output] = projected_evecs[:, inds_sigma]
                 else:
                     # Using numpy.linalg.eigh
 
-                    prev_ops_sparse = ss.csc_matrix(prev_ops)
-                    projected_superoperator = ((prev_ops_sparse.H).dot(self.superoperators[ind_output])).dot(prev_ops_sparse)
+                    proj_curr_ops_sparse = ss.csc_matrix(proj_curr_ops)
+                    projected_superoperator = ((proj_curr_ops_sparse.H).dot(self.superoperators[ind_output])).dot(proj_curr_ops_sparse)
                     self.projected_superoperators.append(projected_superoperator)
 
                     (evalsPSO, evecsPSO) = nla.eigh(projected_superoperator.toarray())
                     self.projected_eigenvalues.append(evalsPSO)
-                    projected_evecs = np.dot(prev_ops, evecsPSO)
-                    self.projected_eigenvectors.append(projected_evecs)    
+                    projected_evecs = np.dot(proj_curr_ops, evecsPSO)
+                    self.projected_eigenvectors.append(projected_evecs)
+
+                    if isinstance(self.input_symmetries[ind_output], Transformation):
+                        if self.operation_modes[ind_output] == 'commutator':
+                            sigma = 1.0
+                        else:
+                            sigma = -1.0
+                    else:
+                        sigma = 0.0
+
+                    inds_sigma = np.where(np.abs(evalsPSO - sigma) < tol)[0]
+                    self.projected_output_operators[ind_output] = projected_evecs[:, inds_sigma]
 
             if verbose:
                 dim_output = int(self.projected_output_operators[-1].shape[1])
