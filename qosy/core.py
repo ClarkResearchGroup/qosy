@@ -298,7 +298,7 @@ class SymmetricOperatorGenerator:
         self.operation_modes.append(operation_mode)
         self.input_symmetries.append(symmetry)
 
-    def generate(self, sparsification=True, orthogonalization=True, verbose=True, tol=1e-10):
+    def generate(self, sparsification=True, orthogonalization=False, verbose=True, tol=1e-10):
         """Generate the operators in the given Basis,
         that satisfy the given symmetries.
 
