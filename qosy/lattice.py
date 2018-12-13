@@ -75,16 +75,17 @@ class Lattice:
         directions. True means periodic, False means open.
     dim : int
         The dimension d of the Lattice.
-    precision : float
+    precision : int
         The precision with which to consider atomic coordinates
         equivalent.
     """
     
-    def __init__(self, unit_cell, num_cells, periodic_boundaries=None, precision=3):
+    def __init__(self, unit_cell, num_cells, periodic_boundaries=None, precision=8):
         self.unit_cell = unit_cell
         self.num_cells = num_cells
 
         self.precision = precision
+        self.tol       = 10.0**(-precision)
 
         # A list of tuples of the positions, orbital names, and unit cell coordinates
         # of each orbital:
@@ -114,6 +115,9 @@ class Lattice:
                 for ind_vec in range(self.dim):
                     pos += coords_cell[ind_vec] * unit_cell.lattice_vectors[ind_vec]
                 pos += pos_atom
+
+                # Make sure the zeros are exactly zero (no floating point roundoff).
+                pos      = np.array([x if np.abs(x) > self.tol else 0.0 for x in pos])
                 pos_name = np.array2string(pos.flatten(), precision=self.precision)
 
                 for orbital_name in orbitals_atom:
@@ -158,7 +162,11 @@ class Lattice:
         # the periodic edges. The first boundary vector is the
         # zero vector, which corresponds to no translation.
         for boundary_vector in self._boundary_vectors:
+            # Shift the position.
             pos      = position + boundary_vector
+            # Make sure the zeros are exactly zero (no floating point roundoff).
+            pos      = np.array([x if np.abs(x) > self.tol else 0.0 for x in pos])
+            
             pos_name = np.array2string(pos.flatten(), precision=self.precision)
             
             if (pos_name, orbital_name) in self._indices_orbitals:

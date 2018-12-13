@@ -25,7 +25,7 @@ import numpy.linalg as nla
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
 
-from .tools import intersection, gram_schmidt
+from .tools import intersection, gram_schmidt, sparsify
 from .basis import Operator
 from .algebra import commutant_matrix
 from .transformation import Transformation, symmetry_matrix
@@ -298,7 +298,7 @@ class SymmetricOperatorGenerator:
         self.operation_modes.append(operation_mode)
         self.input_symmetries.append(symmetry)
 
-    def generate(self, orthogonalize=True, verbose=True, tol=1e-10):
+    def generate(self, sparsification=True, orthogonalization=True, verbose=True, tol=1e-10):
         """Generate the operators in the given Basis,
         that satisfy the given symmetries.
 
@@ -308,7 +308,8 @@ class SymmetricOperatorGenerator:
              of Transformation :math:`\hat{\mathcal{U}}` and diagonalize it.
           2. *Projection:* In order, project the results for the previous 
              symmetries onto the current symmetry.
-          3. *Orthogonalization:* (optional) In reverse order, orthogonalize the results
+          3. *Sparsification:* (optional) In order, sparsify the vectors obtained from steps 1-2.
+          4. *Orthogonalization:* (optional) In reverse order, orthogonalize the results
              for the later symmetries on the earlier symmetries.
 
         The results of step 1 are stored in ``output_operators``, while the results
@@ -316,8 +317,10 @@ class SymmetricOperatorGenerator:
 
         Parameters
         ----------
-        orthogonalize : bool, optional
-            Specifies whether to perform step 3. Defaults to True.
+        sparsification : bool, optional
+            Specifies whether to perform step 4. Defaults to True.
+        orthogonalization : bool, optional
+            Specifies whether to perform step 3. Defaults to False.
         verbose : bool, optional
             Specifies whether to print the status of the operator generator.
             Defaults to True.
@@ -433,9 +436,18 @@ class SymmetricOperatorGenerator:
                 dim_output = int(self.projected_output_operators[-1].shape[1])
                 print(' ({}) The projected vector space of operators has dimension: {}'.format(ind_output+1, dim_output))
 
-        if orthogonalize:
+        if sparsification:
             if verbose:
-                print('===== 3. POST-PROCESSING: ORTHOGONALIZATION =====')
+                print('===== 3. POST-PROCESSING: SPARSIFICATION =====')
+
+            for ind_output in range(num_inputs):
+                curr_ops = self.projected_output_operators[ind_output]
+                self.projected_output_operators[ind_output] = sparsify(curr_ops)
+                print(' ({}) Sparsified a vector space of dim {}'.format(ind_output+1, int(curr_ops.shape[1])))
+        
+        if orthogonalization:
+            if verbose:
+                print('===== 4. POST-PROCESSING: ORTHOGONALIZATION =====')
             # Post processing: Go through the projected output
             # vector spaces in reverse order, V_N', V_{N-1}', ..., V_1', and use the
             # Gram-Schmidt procedure to orthogonalize them.
@@ -457,4 +469,3 @@ class SymmetricOperatorGenerator:
                     dim_curr = int(curr_ops.shape[1])
                     dim_prev = int(prev_ops.shape[1])
                     print(' ({}) Orthogonalized a vector space of dim {} against one with dim {}'.format(ind_output, dim_prev, dim_curr))
-        

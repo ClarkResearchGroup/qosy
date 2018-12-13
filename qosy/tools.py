@@ -6,6 +6,7 @@ throughout ``qosy``.
 
 import numpy as np
 import numpy.linalg as nla
+import scipy.linalg as sla
 
 def sort_sign(vector, tol=1e-10):
     """Stable sort the vector and return
@@ -273,3 +274,45 @@ def intersection(A, B, tol=1e-10):
     
     return intersectionAB
 
+def sparsify(vectors, orthogonalize=True, tol=1e-12):
+    """Heuristically compute a sparsified representation 
+    of the vectors, i.e., a new basis of sparser vectors 
+    that span the same vector space.
+
+    Parameters
+    ----------
+    vectors : ndarray or scipy.sparse.csc_matrix
+        The vectors to sparsify.
+    orthogonalize : bool, optional
+        Specifies whether to make the sparsified vectors orthogonal.
+        In general, orthogonalization makes the vectors denser.
+        Defaults to True.
+    tol : float, optional
+        The tolerance with which numbers are considered zero.
+
+    Returns
+    -------
+    ndarray
+        A matrix whose columns are the sparsified vectors.
+    """
+
+    # Perform an LU decomposition, which
+    # will do a reduced-row echelon form
+    # decomposition. The L matrix corresponds
+    # to a new set of vectors that are
+    # sparser than the original (but, are
+    # certainly not optimally sparse).
+    (vectors_rre, _) = sla.lu(vectors, permute_l=True)
+
+    num_vectors = int(vectors_rre.shape[1])
+
+    if orthogonalize:
+        vectors_rre = gram_schmidt(vectors_rre[:, ::-1])
+    else:
+        vectors_rre = vectors_rre[:, ::-1]
+        
+    # Normalize the vectors.
+    for ind_vec in range(num_vectors):
+        vectors_rre[:, ind_vec] /= nla.norm(vectors_rre[:, ind_vec])
+    
+    return vectors_rre

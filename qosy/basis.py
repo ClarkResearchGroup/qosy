@@ -873,30 +873,3 @@ def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
         total_basis += cluster_basis(k, cluster_labels, op_type)
         
     return total_basis
-
-def print_vectors(basis, vectors):
-    """Print in human-readable form the vectors
-    as Operators in the given Basis.
-    
-    Parameters
-    ----------
-    basis : Basis
-        The Basis of OperatorStrings that the vector
-        is represented in.
-    vectors : ndarray
-        The vectors to print.
-    """
-    
-    if len(basis) != int(vectors.shape[0]):
-        raise ValueError('Vectors are not of the right size {} to be in the basis of dimension {}'.format(vectors.shape, len(basis)))
-
-    num_vecs = int(vectors.shape[1])
-    
-    operators = [Operator(vectors[:,ind_vec], basis.op_strings) for ind_vec in range(num_vecs)]
-
-    ind_vec = 1
-    for operator in operators:
-        cleaned_operator = operator.remove_zeros()
-        print('vector {} = '.format(ind_vec))
-        print(cleaned_operator)
-        ind_vec += 1
