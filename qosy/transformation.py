@@ -3,16 +3,17 @@
 This module includes a Transformation object that represents
 a discrete transformation, such as charge-conjugation or a
 space group symmetry, and a method for computing the effect
-of Transformation on a Basis of OperatorStrings.
+of a Transformation on a Basis of OperatorStrings.
 """
 
 import numpy as np
 import numpy.linalg as nla
 import scipy.sparse as ss
 
-from .tools import sort_sign
+from .tools import sort_sign, swap
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
+from .lattice import Lattice
 
 class Transformation:
     """A Transformation object represents a 
@@ -183,17 +184,15 @@ def _time_reversal_rule(op_string_A, info, tol=1e-12):
     Transformation for spins:
         \sigma^a_i -> -\sigma^a_i (means T \sigma^a_i T^{-1} = -\sigma^a_i)
     Transformation for (spinless) fermions:
-        c_i -> +/- c_i, c_i^\dagger -> +/- c_i^\dagger, i -> -i (imaginary number)
-        a_i -> +/- a_i, b_i -> -/+ b_i, d_i -> d_i, i -> -i (imaginary number)
+        c_i -> +c_i, c_i^\dagger -> +c_i^\dagger, i -> -i (imaginary number)
+        a_i -> +a_i, b_i -> -b_i, d_i -> d_i, i -> -i (imaginary number)
     """
     
     op_type = op_string_A.op_type
     if not (op_type == 'Pauli' or op_type == 'Majorana'):
         raise ValueError('Invalid op_type: {}'.format(op_type))
         
-    # Extra information specifies whether time-reversal transformation
-    # is of type T^2 = 1 or T^2 = (-1)^N
-    extra_sign = float(info)
+    # No extra information needed.
     
     coeffB      = 1.0
     op_string_B = op_string_A
@@ -219,35 +218,26 @@ def _time_reversal_rule(op_string_A, info, tol=1e-12):
         # A minus sign occurs if there is an imaginary number in front of the Majorana string.
         if numABs*(numABs-1)//2 % 2 == 1:
             coeffB *= -1.0
-        # A minus sign occurs if T^2 = (-1)^N and there are an odd number of a_i,b_i operators.
-        if numABs % 2 == 1:
-            coeffB *= extra_sign
     else:
         # A minus sign occurs for every Pauli matrix in the Pauli string.
         num_ops = len(op_string_B.orbital_operators)
         if num_ops % 2 == 1:
             coeffB *= -1.0
-            
-        # TODO: Implement T^2=(-1)^N symmetry for spin-1/2's if it makes sense.
-        if np.abs(extra_sign - 1.0) > tol:
-            raise NotImplementedError('Unsupported for spin-1/2 operators.')
-
+           
     return Operator([coeffB], [op_string_B])
 
 def _particle_hole_rule(op_string_A, info):
     """Transformation rule for particle hole symmetry C.
     Transformation for (spinless) fermions:
-        c_i -> +/- c_i^\dagger, c_i^\dagger -> +/- c_i, i -> i (imaginary number)
-        a_i -> +/- a_i, b_i -> -/+ b_i, d_i -> - d_i, i -> i (imaginary number)
+        c_i -> +c_i^\dagger, c_i^\dagger -> +c_i, i -> i (imaginary number)
+        a_i -> +a_i, b_i -> -b_i, d_i -> -d_i, i -> i (imaginary number)
     """
     
     op_type = op_string_A.op_type
     if op_type != 'Majorana':
         raise ValueError('Invalid op_type: {}'.format(op_type))
         
-    # Extra information specifies whether particle-hole transformation
-    # is of type C^2 = 1 or C^2 = (-1)^N
-    extra_sign = float(info)
+    # No extra information needed.
     
     coeffB      = 1.0
     op_string_B = op_string_A
@@ -273,10 +263,6 @@ def _particle_hole_rule(op_string_A, info):
     # Every d_i operator contributes a minus sign.
     if numDs % 2 == 1:
         coeffB *= -1.0
-        
-    # A minus sign occurs if C^2 = (-1)^N and there are an odd number of a_i,b_i operators.
-    if numABs % 2 == 1:
-        coeffB *= extra_sign
             
     return Operator([coeffB], [op_string_B])
 
@@ -313,7 +299,76 @@ def label_permutation(permutation):
     """
     return Transformation(_permutation_rule, permutation)
 
-def time_reversal(sign=1.0):
+def spin_flip_symmetry(lattice, up_name='Up', dn_name='Dn'):    
+    """Create the symmetry that flips all spin-:math:`1/2` 
+    degrees of freedom between up and down.
+
+    The effect of this transformation is to relabel all
+    orbitals so that :math:`(i,\\uparrow) \\leftrightarrow (i,\\downarrow)`
+
+    Parameters
+    ----------
+    lattice : Lattice
+        The Lattice object that keeps track of the orbitals
+        in the system.
+    up_name : str, optional
+        Specifies the name of the :math:`+1/2` spin. Defaults to 'Up'.
+    dn_name : str, optional
+        Specifies the name of the :math:`-1/2` spin. Defaults to 'Dn'.
+
+    Returns
+    -------
+    Transformation
+        The discrete spin-flip symmetry transformation.
+    """
+    
+    spinflip_permutation = [lattice.index(r, swap(orbital_name, up_name, dn_name)) \
+                            for (r, orbital_name,_) in lattice]
+
+    if -1 in spinflip_permutation:
+        raise ValueError('Invalid spin-flip permutation:\n{}'.format(spinflip_permutation))
+    
+    spinflip = qy.label_permutation(spinflip_permutation)
+
+    return spinflip
+
+def space_group_symmetry(lattice, R, d):
+    """Create a space group symmetry specified by
+    the given rotation matrix and displacement
+    vector.
+
+    The space group symmetry transformation
+    relabels the spatial coordinate of an 
+    orbital from position :math:`r`
+    to :math:`r'` according to
+       :math:`r \rightarrow r'=Rr + d.`
+
+    Parameters
+    ----------
+    lattice : Lattice
+        An `M`-dimensional Lattice.
+    R : ndarray, (M,M)
+        The spatial rotation matrix :math:`R`.
+    d : ndarray, (M,)
+        The displacement vector :math:`d`.
+
+    Returns
+    -------
+    Transformation
+        The discrete space group symmetry transformation.
+    """
+    
+    orbital_label_permutation = [lattice.index(np.dot(R,r) + d, orbital_name) \
+                                 for (r, orbital_name,_) in lattice]
+
+    if -1 in orbital_label_permutation:
+        raise ValueError('Invalid permutation of orbital labels:\n{}'.format(orbital_label_permutation))
+
+    symmetry = label_permutation(orbital_label_permutation)
+    
+    return symmetry
+
+def time_reversal():
     """Create a (spin-less) time-reversal 
     Transformation :math:`\hat{\mathcal{T}}`.
     
@@ -324,48 +379,35 @@ def time_reversal(sign=1.0):
     
     The transformation acts on (spin-less)
     Fermionic operators as
-        :math:`c_j \\rightarrow \pm c_j, \quad c_j^\dagger \\rightarrow  \pm c_j^\dagger`
+        :math:`c_j \\rightarrow c_j, \quad c_j^\dagger \\rightarrow  c_j^\dagger`
     and Majorana operators as
-        :math:`a_j \\rightarrow \pm a_j, \quad b_j \\rightarrow \mp b_j, \quad d_j \\rightarrow d_j`
+        :math:`a_j \\rightarrow a_j, \quad b_j \\rightarrow -b_j, \quad d_j \\rightarrow d_j`
 
     On spin operators, the transformation acts as:
         :math:`\sigma^a_j \\rightarrow -\sigma^a_j \quad (\hat{\mathcal{T}} \sigma^a_j \hat{\mathcal{T}}^{-1} = -\sigma^a_j)`
-
-    Parameters
-    ----------
-    sign : 1.0 or -1.0, optional
-        Specifies whether :math:`\hat{\mathcal{T}}^2 = 1` or :math:`\hat{\mathcal{T}}^2 = (-1)^\hat{N}`.
-        Defaults to 1.0.
 
     Returns
     -------
     Transformation
         The Transformation that implements
-        time-reversal.
+        spin-less time-reversal.
 
     Examples
     --------
     >>> T = qosy.time_reversal()
     """
     
-    return Transformation(_time_reversal_rule, sign)
+    return Transformation(_time_reversal_rule, None)
 
-def particle_hole(sign=1.0):
+def particle_hole():
     """Create a particle-hole (or charge-conjugation) 
     Transformation :math:`\hat{\mathcal{C}}`.
     
     The transformation acts on (spin-less)
     Fermionic operators as
-        :math:`c_j \\rightarrow \pm c_j^\dagger, \quad c_j^\dagger \\rightarrow \pm c_j`
+        :math:`c_j \\rightarrow c_j^\dagger, \quad c_j^\dagger \\rightarrow c_j`
     and Majorana operators as
-        :math:`a_j \\rightarrow \pm a_j, \quad b_j \\rightarrow \mp b_j, \quad d_j \\rightarrow - d_j`
-
-    Parameters
-    ----------
-    sign : 1.0 or -1.0, optional
-        Specifies whether :math:`\hat{\mathcal{C}}^2 = 1` 
-        or :math:`\hat{\mathcal{C}}^2 = (-1)^\hat{N}`.
-        Defaults to 1.0.
+        :math:`a_j \\rightarrow a_j, \quad b_j \\rightarrow -b_j, \quad d_j \\rightarrow -d_j`
 
     Returns
     -------
@@ -375,17 +417,65 @@ def particle_hole(sign=1.0):
 
     Examples
     --------
-    >>> C = qosy.particle_hole()
+        >>> C = qosy.particle_hole()
     """
     
-    return Transformation(_particle_hole_rule, sign)
+    return Transformation(_particle_hole_rule, None)
 
-def charge_conjugation(sign=1.0):
-    """Same as particle_hole(sign).
+def charge_conjugation():
+    """Same as `particle_hole()`.
     """
     
-    return particle_hole(sign)
+    return particle_hole()
 
+def _sz_rule(op_string, info):
+    # Helper function to define the spin_parity transformation.
+    info = (up_labels, dn_labels)
+    
+    num_up = 0
+    num_dn = 0
+    for orbital_label in op_string.orbital_labels:
+        if orbital_label in up_labels:
+            num_up += 1
+        elif orbital_label in dn_labels:
+            num_dn += 1
+            
+    sign = 1.0
+    if num_dn % 2 == 1:
+        sign = -1.0
+        
+    return Operator([sign], [op_string])
+
+def spin_parity_symmetry(lattice, up_name='Up', dn_name='Dn'):
+    """Create a transformation whose effect is to assign
+    :math:`-1` to an OperatorString with an odd number
+    of down spins orbitals and :math:`+1` otherwise.
+
+    Parameters
+    ----------
+    lattice : Lattice
+        The Lattice object that keeps track of the orbitals
+        in the system.
+    up_name : str, optional
+        Specifies the name of the :math:`+1/2` spin. Defaults to "Up".
+    dn_name : str, optional
+        Specifies the name of the :math:`-1/2` spin. Defaults to "Dn".
+
+    Returns
+    -------
+    Transformation
+        The transformation.
+    """
+
+    up_labels = set([lattice.index(r, name) \
+                     for (r, name, _) in lattice if up_name in name])
+    dn_labels = set([lattice.index(r, name) \
+                     for (r, name, _) in lattice if dn_name in name])
+
+    info = (up_labels, dn_labels)
+    
+    return Transformation(_sz_rule, info)
+    
 def _symmetry_matrix_opstrings(basis, transformation, tol=1e-12):
     """Compute the symmetry matrix for a Basis of OperatorStrings.
     """
@@ -432,7 +522,6 @@ def _symmetry_matrix_operators(operators, transformation, tol=1e-12):
     num_operators = len(operators)
     dim_basis     = len(operators_basis)
 
-    # TODO: compute the correct combined symmetry matrix for the Operators list basis...
     # Create a conversion matrix from the Basis
     # of OperatorStrings to the list of Operators.
     data     = []
@@ -449,9 +538,6 @@ def _symmetry_matrix_operators(operators, transformation, tol=1e-12):
     
     # Calculate the Moore-Penrose pseudo-inverse using numpy.
     pinv_operators = ss.csc_matrix(nla.pinv(coeffs_operators.toarray()))
-
-    # Compute the projector C * C+ onto the Operators list "basis".
-    #projector_operators = coeffs_operators.dot(pinv_operators)
 
     print('pinv_operators=\n{}'.format(pinv_operators.toarray()))
     

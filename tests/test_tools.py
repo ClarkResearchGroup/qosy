@@ -28,6 +28,13 @@ def test_compare():
     assert(qy.tools.compare((0,1), (0,1)) == 0)
     assert(qy.tools.compare((0,1), (1,0)) < 0)
 
+def test_swap():
+    assert(qy.tools.swap('A B C', 'A', 'B') == 'B A C')
+    assert(qy.tools.swap('1 2 3', '1', '4') == '4 2 3')
+    assert(qy.tools.swap('Up Up Dn', 'Up', 'Dn') == 'Dn Dn Up')
+    assert(qy.tools.swap('Up Up Dn', 'Dn', 'Up') == 'Dn Dn Up')
+    assert(qy.tools.swap('1 2 3', 'X', 'Y') == '1 2 3')
+    
 def test_maximal_cliques():
     # Toy graph on https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
     adjacency_lists = [[1,4], [0,2,4], [1,3], [2,4,5], [0,1,3], [3]]

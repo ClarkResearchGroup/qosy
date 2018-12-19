@@ -182,6 +182,36 @@ def cmp_to_key(mycmp):
             return mycmp(self.obj, other.obj) != 0
     return K
 
+def swap(string, nameA, nameB):
+    """ Swap all occurences of nameA with nameB
+    and vice-versa in the string.
+
+    Parameters
+    ----------
+    string : str
+        The string to manipulate.
+    nameA : str
+        The substring to replace with `nameB`.
+    nameB : str
+        The substring to replace with `nameA`.
+
+    Returns
+    -------
+    str
+        The modified string.
+
+    Examples
+    --------
+        >>> swap('A Up B Dn', 'Up', 'Dn') # 'A Dn B Up'
+        >>> swap('X X A', 'X', 'Y') # 'Y Y A'
+        >>> swap('1 2 3', '1', '3') # '3 2 1'
+    """
+    
+    result = string.replace(nameA, '({})'.format(nameA))
+    result = result.replace(nameB, nameA)
+    result = result.replace('({})'.format(nameA), nameB)
+
+    return result
 
 def gram_schmidt(matrix, tol=0.0):
     """Perform Gram-Schmidt decomposition.
