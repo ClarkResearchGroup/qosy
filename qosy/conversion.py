@@ -436,3 +436,33 @@ def print_vectors(basis, vectors, convert_to=None, norm_order=None):
         print('vector {} = '.format(ind_vec))
         print(cleaned_operator)
         ind_vec += 1
+
+def print_operators(operators, convert_to=None, norm_order=None):
+    """Print in human-readable form a list of Operators.
+    
+    Parameters
+    ----------
+    operators : list of Operators
+        The Operators to print.
+    convert_to : str, optional
+        If not None, convert OperatorStrings to the given type
+        before printing. Defaults to None.
+    norm_order : {non-zero int, inf, -inf, 'fro', 'nuc'}, optional
+        Normalizes the vector to have a norm of this order 
+        (see `numpy.norm`). Defaults to None, which is the 
+        :math:`\ell_2`-norm. Another useful norm is the `inf` 
+        order norm.
+    """
+    
+    if convert_to is not None:
+        operators_to_print = [convert(op, convert_to) for op in operators]
+    else:
+        operators_to_print = operators
+    
+    ind_vec = 1
+    for operator in operators_to_print:
+        cleaned_operator = operator.remove_zeros()
+        cleaned_operator.normalize(order=norm_order)
+        print('operator {} = '.format(ind_vec))
+        print(cleaned_operator)
+        ind_vec += 1

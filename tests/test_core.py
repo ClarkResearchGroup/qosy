@@ -228,7 +228,7 @@ def test_inverse_ssh_model_generation():
         op_generator.add_symmetry(symmetry)
 
     # Generate operators obeying the given symmetries.
-    op_generator.generate()
+    op_generator.generate(mode='noncumulative')
 
     # Expected: should return a single operator, the SSH model
     ssh_chain = qy.Operator(np.zeros(len(basis)), basis.op_strings)
@@ -280,6 +280,44 @@ def test_inverse_ssh_model_generation():
     assert(int(ops.shape[1]) == 1)
 
     op = qy.Operator(ops[:,0], basis.op_strings)
+    op.normalize(order=np.inf)
+
+    # Due to finite size effects, the final result is not *exactly* the SSH chain,
+    # but the SSH chain with an extra bond with small weight connecting the two
+    # edges of the chain. I tested that the bond vanishes for larger system
+    # sizes, but, to make this test fast, I used a small system size and
+    # allowed the tolerance to be large.
+    tol = 0.05
+    assert((op - expected_op).norm() < tol or (op - (-expected_op)).norm() < tol)
+
+    # Run the generator in cumulative mode. The projected results should be the
+    # same as for the noncumulative mode.
+    op_generator.generate(mode='cumulative')
+    
+    # Make sure the shapes of the saved data are consistent.
+    for ind_output in range(len(symmetries)):
+        # Vectors are all the same sizes
+        assert(len(basis) \
+               == op_generator.projected_eigenvectors[ind_output].shape[0])
+        assert(op_generator.projected_eigenvectors[ind_output].shape[0] \
+               == op_generator.eigenvectors[ind_output].shape[0])
+        assert(op_generator.eigenvectors[ind_output].shape[0] \
+               == op_generator.output_operators[ind_output].shape[0])
+        assert(op_generator.output_operators[ind_output].shape[0] \
+               == op_generator.projected_output_operators[ind_output].shape[0])
+
+        #print(op_generator.projected_superoperators[ind_output].shape)
+        #print(op_generator.projected_output_operators[ind_output].shape)
+
+        if ind_output > 0:
+            assert(op_generator.projected_superoperators[ind_output].shape[0] \
+               == op_generator.projected_output_operators[ind_output].shape[1])
+
+    ops = op_generator.projected_output_operators[-1]
+
+    assert(len(ops) == 1)
+
+    op = ops[0]
     op.normalize(order=np.inf)
 
     # Due to finite size effects, the final result is not *exactly* the SSH chain,
