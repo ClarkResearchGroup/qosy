@@ -111,11 +111,11 @@ class OperatorString:
         Examples
         --------
         The Pauli string \sigma^x_1 \sigma^y_2 \sigma^z_4 can be constructed with
-        >>> OperatorString(['X', 'Y', 'Z'], [1, 2, 4], 'Pauli')
+            >>> OperatorString(['X', 'Y', 'Z'], [1, 2, 4], 'Pauli')
         The Majorana string i a_1 b_3 d_5 d_6 can be constructed with
-        >>> OperatorString(['A', 'B', 'D', 'D'], [1, 3, 5, 6], 'Majorana')
+            >>> OperatorString(['A', 'B', 'D', 'D'], [1, 3, 5, 6], 'Majorana')
         The Fermion string c_1^\dagger c_2^\dagger c_3 + H.c. can be constructed with
-        >>> OperatorString(['CDag', 'CDag', 'C'], [1, 2, 3], 'Fermion')
+            >>> OperatorString(['CDag', 'CDag', 'C'], [1, 2, 3], 'Fermion')
         """
 
         self.orbital_operators = np.array(orbital_operators, dtype=str)
@@ -168,10 +168,10 @@ class OperatorString:
 
         Examples
         --------
-        >>> op_string = qosy.Operator(['X', 'Y', 'Z'], [1, 2, 3], 'Pauli')
-        >>> print(op_string) # 'X 1 Y 2 Z 3 '
-        >>> op_string = qosy.Operator(['CDag', 'CDag', 'C'], [1, 2, 3], 'Fermion', prefactor=1j)
-        >>> print(op_string) # '1j CDag 1 CDag 2 C 3 '
+            >>> op_string = qosy.Operator(['X', 'Y', 'Z'], [1, 2, 3], 'Pauli')
+            >>> print(op_string) # 'X 1 Y 2 Z 3 '
+            >>> op_string = qosy.Operator(['CDag', 'CDag', 'C'], [1, 2, 3], 'Fermion', prefactor=1j)
+            >>> print(op_string) # '1j CDag 1 CDag 2 C 3 '
         """
         
         return self.name
@@ -202,11 +202,11 @@ class OperatorString:
 
         Examples
         --------
-        >>> op_string1 = qosy.Operator(['X', 'Y', 'Z'], [1, 2, 3], 'Pauli')
-        >>> op_string2 = qosy.Operator(['Z', 'Z', 'Z'], [1, 2, 3], 'Pauli')
-        >>> op_string1 == op_string2 # False
-        >>> op_string3 = qosy.opstring('X 1 Y 2 Z 3')
-        >>> op_string1 == op_string3 # True
+            >>> op_string1 = qosy.Operator(['X', 'Y', 'Z'], [1, 2, 3], 'Pauli')
+            >>> op_string2 = qosy.Operator(['Z', 'Z', 'Z'], [1, 2, 3], 'Pauli')
+            >>> op_string1 == op_string2 # False
+            >>> op_string3 = qosy.opstring('X 1 Y 2 Z 3')
+            >>> op_string1 == op_string3 # True
         """
         
         equals = (len(self.orbital_operators) == len(other.orbital_operators)) and (self.orbital_operators == other.orbital_operators).all() and (self.orbital_labels == other.orbital_labels).all() and (self.op_type == other.op_type)

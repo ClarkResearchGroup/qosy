@@ -334,21 +334,20 @@ def spin_flip_symmetry(lattice, up_name='Up', dn_name='Dn'):
 
 def space_group_symmetry(lattice, R, d):
     """Create a space group symmetry specified by
-    the given rotation matrix and displacement
-    vector.
+    the given matrix and displacement vector.
 
     The space group symmetry transformation
     relabels the spatial coordinate of an 
     orbital from position :math:`r`
     to :math:`r'` according to
-       :math:`r \rightarrow r'=Rr + d.`
+       :math:`r \\rightarrow r'=Rr + d.`
 
     Parameters
     ----------
     lattice : Lattice
         An `M`-dimensional Lattice.
     R : ndarray, (M,M)
-        The spatial rotation matrix :math:`R`.
+        The matrix :math:`R`.
     d : ndarray, (M,)
         The displacement vector :math:`d`.
 
@@ -533,13 +532,9 @@ def _symmetry_matrix_operators(operators, transformation, tol=1e-12):
             row_inds.append(operators_basis.index(os))
             col_inds.append(ind_op)
     coeffs_operators = ss.csc_matrix((data, (row_inds, col_inds)), shape=(dim_basis, num_operators), dtype=complex)
-
-    print('coeffs_operators=\n{}'.format(coeffs_operators.toarray()))
     
     # Calculate the Moore-Penrose pseudo-inverse using numpy.
     pinv_operators = ss.csc_matrix(nla.pinv(coeffs_operators.toarray()))
-
-    print('pinv_operators=\n{}'.format(pinv_operators.toarray()))
     
     # Assemble the symmetry matrix in the combined Basis of OperatorStrings.
     symmetry_matrix_opstrings = _symmetry_matrix_opstrings(operators_basis, transformation, tol)
@@ -562,9 +557,9 @@ def symmetry_matrix(basis, transformation, tol=1e-12):
 
     Parameters
     ----------
-    basis : Basis
-        The Basis of OperatorStrings used to
-        represent the symmetry matrix.
+    basis : Basis or list of Operators
+        The Basis of OperatorStrings or list of
+        Operators used to represent the symmetry matrix.
     transformation : Transformation
         The Transformation to perform 
         on the OperatorStrings.

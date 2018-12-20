@@ -183,7 +183,7 @@ def test_inverse_ssh_model_generation():
 
     # Use a 1D chain lattice with one orbital
     # per unit cell.
-    lattice = qy.lattice.chain(N, ['A'], periodic=True)
+    lattice = qy.lattice.chain(N, periodic=True, orbital_names=['A'])
     
     # Use a distance basis of two-site operators
     # separated up to a unit cell away.

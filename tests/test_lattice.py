@@ -3,7 +3,7 @@ import numpy as np
 
 def test_chain_lattice():
     N = 6
-    chain_lattice = qy.lattice.chain(N, ['A', 'B'])
+    chain_lattice = qy.lattice.chain(N, orbital_names=['A', 'B'])
 
     expected_orbital_names  = ['A', 'B']*N
     expected_atom_positions = [np.zeros(1), np.zeros(1)]*N

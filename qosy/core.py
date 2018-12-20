@@ -30,7 +30,7 @@ from .basis import Operator
 from .algebra import commutant_matrix
 from .transformation import Transformation, symmetry_matrix
 
-def commuting_operators(basis, operator, operation_mode='commutator', return_com_matrix=False, num_vecs=None, tol=1e-10):
+def commuting_operators(basis, operator, operation_mode='commutator', return_superoperator=False, num_vecs=None, tol=1e-10):
     """Find operators in the vector space spanned by the
     OperatorStrings :math:`\hat{h}_a` that commute (or 
     anti-commute) with the given Operator 
@@ -51,9 +51,10 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_com
         commute with `operator` ('commutator') or anti-commute
         with `operator` ('anticommutator'). Defaults to 
         'commutator'.
-    return_com_matrix : bool, optional
-        If True, return the commutant matrix along with
-        its null space. Default is False.
+    return_superoperator : bool, optional
+        If True, return :math:`C^\dagger C` where :math:`C`
+        is the commutant matrix, along with eigenvalues and
+        eigenvectors. Default is False.
     num_vecs : int, optional
         Default to None. If None, then the commutant matrix
         is converted to a dense matrix and full diagonalization
@@ -73,7 +74,7 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_com
         coefficients :math:`J_a^{(i)}` of operators 
         :math:`\hat{H}^{(i)}=\sum_{a} J_a^{(i)} \hat{h}_a` that commute 
         (or anti-commute) with the given Operator :math:`\hat{\mathcal{O}}`.
-        If `return_com_matrix` is True, returns a tuple of the null
+        If `return_superoperator` is True, returns a tuple of the null
         vectors, the matrix :math:`C^\dagger C`, its eigenvalues, and its eigenvectors
         as sparse scipy matrices where :math:`C` is the commutant matrix.
     """
@@ -95,12 +96,12 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_com
     if num_vecs is not None and len(inds_ns) == num_vecs:
         warnings.warn('All {} vectors found with eigsh were in the null space. Increase num_vecs to ensure that you are not missing null vectors.'.format(num_vecs))
 
-    if return_com_matrix:
+    if return_superoperator:
         return (null_space, CDagC, evals, evecs)
     else:
         return null_space
 
-def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=None, return_sym_matrix=False, tol=1e-10):
+def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=None, return_superoperator=False, tol=1e-10):
     """Find operators in the vector space spanned by the
     OperatorStrings :math:`\hat{h}_a` that commute (or anti-commute)
     with the Transformation :math:`\hat{\mathcal{U}}`.
@@ -121,9 +122,11 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
         commute with `transform` ('commutator') or anti-commute
         with `transform` ('anticommutator'). Defaults to 
         'commutator'.
-    return_sym_matrix : bool, optional
-        If True, return the symmetry matrix and its spectrum along with
-        its :math:`(\pm 1)` eigenspace. Default is False.
+    return_superoperator : bool, optional
+        If True, returns :math:`I \mp (S + S^\dagger)/2` where
+        :math:`S` is the symmetry matrix. The null space of 
+        this superoperator corresponds to the :math:`(\pm 1)` 
+        eigenspace of the symmetry matrix. Default is False.
     num_vecs : int, optional
         Default to None. If None, then the symmetry matrix
         is converted to a dense matrix and full diagonalization
@@ -143,8 +146,8 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
         coefficients :math:`J_a^{(i)}` of operators 
         :math:`\hat{H}^{(i)}=\sum_{a} J_a^{(i)} \hat{h}_a` that commute 
         (or anti-commute) with the given Transformation :math:`\hat{\mathcal{U}}`.
-        If `return_sym_matrix` is True, returns a tuple of the null
-        vectors, the symmetry matrix, its eigenvalues, and its eigenvectors
+        If `return_superoperator` is True, returns a tuple of the null
+        vectors, a modified symmetry matrix, its eigenvalues, and its eigenvectors
         as sparse scipy matrices.
     """
     
@@ -170,8 +173,9 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
     if num_vecs is not None and len(inds) == num_vecs:
         warnings.warn('All {} vectors found with eigsh were in the ({})-eigenvalue subspace. Increase num_vecs to ensure that you are not missing null vectors.'.format(num_vecs, sign))
 
-    if return_sym_matrix:
-        return (vecs, sym_matrix, evals, evecs)
+    if return_superoperator:
+        superoperator = ss.eye(len(basis), format='csc') - sign * matrix
+        return (vecs, superoperator, 1.0 - sign*evals, evecs)
     else:
         return vecs
 
@@ -298,36 +302,7 @@ class SymmetricOperatorGenerator:
         self.operation_modes.append(operation_mode)
         self.input_symmetries.append(symmetry)
 
-    def generate(self, sparsification=True, orthogonalization=False, verbose=True, tol=1e-10):
-        """Generate the operators in the given Basis,
-        that satisfy the given symmetries.
-
-        This procedure occurs in three steps:
-          1. *Generation:* In order, calculate the commutant matrix of 
-             Operator :math:`\hat{\mathcal{O}}` or the symmetry matrix 
-             of Transformation :math:`\hat{\mathcal{U}}` and diagonalize it.
-          2. *Projection:* In order, project the results for the previous 
-             symmetries onto the current symmetry.
-          3. *Sparsification:* (optional) In order, sparsify the vectors obtained from steps 1-2.
-          4. *Orthogonalization:* (optional) In reverse order, orthogonalize the results
-             for the later symmetries on the earlier symmetries.
-
-        The results of step 1 are stored in ``output_operators``, while the results
-        of steps 2 and 3 are stored in ``projected_output_operators``.
-
-        Parameters
-        ----------
-        sparsification : bool, optional
-            Specifies whether to perform step 4. Defaults to True.
-        orthogonalization : bool, optional
-            Specifies whether to perform step 3. Defaults to False.
-        verbose : bool, optional
-            Specifies whether to print the status of the operator generator.
-            Defaults to True.
-        tol : float, optional
-            Specifies the threshold used to consider whether an eigenvalue is
-            close to :math:`0,\pm 1`. Defaults to 1e-10.
-        """
+    def _generate_noncumulative(self, sparsification=True, orthogonalization=False, verbose=True, tol=1e-10):
         
         num_inputs = len(self.input_symmetries)
 
@@ -350,34 +325,23 @@ class SymmetricOperatorGenerator:
                 if verbose:
                     print('{} OPERATOR {}'.format(op_mode_print, ind_input+1))
                 
-                (output_ops, com_matrix, eigvals, eigvecs) = commuting_operators(self.basis, input_symmetry, operation_mode=operation_mode, return_com_matrix=True, num_vecs=self.num_vecs, tol=tol)
-
-                self.superoperators.append(com_matrix)
-                self.eigenvectors.append(eigvecs)
-                self.eigenvalues.append(eigvals)
-                self.output_operators.append(output_ops)
-
-                if verbose:
-                    dim_output = int(self.output_operators[-1].shape[1])
-                    print('  Generated a vector space of operators of dimension: {}'.format(dim_output))
-                
+                (output_ops, superoperator, eigvals, eigvecs) = commuting_operators(self.basis, input_symmetry, operation_mode=operation_mode, return_superoperator=True, num_vecs=self.num_vecs, tol=tol)              
             elif isinstance(input_symmetry, Transformation):
                 if verbose:
                     print('{} TRANSFORMATION {}'.format(op_mode_print, ind_input+1))
                 
-                (output_ops, sym_matrix, eigvals, eigvecs) = invariant_operators(self.basis, input_symmetry, operation_mode=operation_mode, return_sym_matrix=True, num_vecs=self.num_vecs, tol=tol)
-
-                self.superoperators.append(sym_matrix)
-                self.eigenvectors.append(eigvecs)
-                self.eigenvalues.append(eigvals)
-                self.output_operators.append(output_ops)
-
-                if verbose:
-                    dim_output = int(self.output_operators[-1].shape[1])
-                    print('  Generated a vector space of operators of dimension: {}'.format(dim_output))
+                (output_ops, superoperator, eigvals, eigvecs) = invariant_operators(self.basis, input_symmetry, operation_mode=operation_mode, return_superoperator=True, num_vecs=self.num_vecs, tol=tol)
             else:
                 raise ValueError('Invalid input symmetry of type {}. Must be an Operator or a Transformation.'.format(type(input_symmetry)))
 
+            self.superoperators.append(superoperator)
+            self.eigenvectors.append(eigvecs)
+            self.eigenvalues.append(eigvals)
+            self.output_operators.append(output_ops)
+            
+            if verbose:
+                dim_output = int(self.output_operators[-1].shape[1])
+                print('  Generated a vector space of operators of dimension: {}'.format(dim_output))
 
         if verbose:
             print('===== 2. POST-PROCESSING: PROJECTION =====')
@@ -400,59 +364,32 @@ class SymmetricOperatorGenerator:
                 curr_ops   = self.output_operators[ind_output]
                 prev_ops   = self.projected_output_operators[ind_output-1]
                 
-                # The projected operators in the null space (or +/-1 eigenspace)
-                # can be found by taking intersections of vector spaces.
+                # The current projected operators are the intersection
+                # of the current unprojected operators and the previous
+                # projected operators.
                 proj_curr_ops = intersection(curr_ops, prev_ops)
-                self.projected_output_operators.append(proj_curr_ops)
+
+                # Compute the projected superoperator.
+                proj_curr_ops_sparse    = ss.csc_matrix(proj_curr_ops)
+                projected_superoperator = ((proj_curr_ops_sparse.H).dot(self.superoperators[ind_output])).dot(proj_curr_ops_sparse)
+                self.projected_superoperators.append(projected_superoperator)
                 
-                # Compute the projected superoperator and its eigenvalues and eigenvectors.
+                # Compute the projected superoperator's eigenvalues and eigenvectors.
                 if self.num_vecs is not None:
                     # Using scipy.sparse.linalg.eigsh
-                    
-                    proj_curr_ops_sparse = ss.csc_matrix(proj_curr_ops)
-                    projected_superoperator = ((proj_curr_ops_sparse.H).dot(self.superoperators[ind_output])).dot(proj_currs_ops_sparse)
-                    self.projected_superoperators.append(projected_superoperator)
-
                     sigma = -1e-2
-                    if isinstance(self.input_symmetries[ind_output], Transformation):
-                        if self.operation_modes[ind_output] == 'commutator':
-                            sigma = 1.0
-                        else:
-                            sigma = -1.0
-
                     (evalsPSO, evecsPSO) = ssla.eigsh(projected_superoperator, k=self.num_vecs, sigma=sigma)
-                    self.projected_eigenvalues.append(evalsPSO)
-                    projected_evecs = np.dot(proj_curr_ops, evecsPSO)
-                    self.projected_eigenvectors.append(projected_evecs)
-
-                    if sigma not in [1.0, -1.0]:
-                        sigma = 0.0
-
-                    inds_sigma = np.where(np.abs(evalsPSO - sigma) < tol)[0]
-                    self.projected_output_operators[ind_output] = projected_evecs[:, inds_sigma]
                 else:
                     # Using numpy.linalg.eigh
-
-                    proj_curr_ops_sparse = ss.csc_matrix(proj_curr_ops)
-                    projected_superoperator = ((proj_curr_ops_sparse.H).dot(self.superoperators[ind_output])).dot(proj_curr_ops_sparse)
-                    self.projected_superoperators.append(projected_superoperator)
-
                     (evalsPSO, evecsPSO) = nla.eigh(projected_superoperator.toarray())
-                    self.projected_eigenvalues.append(evalsPSO)
-                    projected_evecs = np.dot(proj_curr_ops, evecsPSO)
-                    self.projected_eigenvectors.append(projected_evecs)
 
-                    if isinstance(self.input_symmetries[ind_output], Transformation):
-                        if self.operation_modes[ind_output] == 'commutator':
-                            sigma = 1.0
-                        else:
-                            sigma = -1.0
-                    else:
-                        sigma = 0.0
-
-                    inds_sigma = np.where(np.abs(evalsPSO - sigma) < tol)[0]
-                    self.projected_output_operators[ind_output] = projected_evecs[:, inds_sigma]
-
+                self.projected_eigenvalues.append(evalsPSO)
+                projected_evecs = np.dot(proj_curr_ops, evecsPSO)
+                self.projected_eigenvectors.append(projected_evecs)
+            
+                inds_nullspace = np.where(np.abs(evalsPSO) < tol)[0]
+                self.projected_output_operators.append(projected_evecs[:, inds_nullspace])
+                    
             if verbose:
                 dim_output = int(self.projected_output_operators[-1].shape[1])
                 print(' ({}) The projected vector space of operators has dimension: {}'.format(ind_output+1, dim_output))
@@ -490,3 +427,98 @@ class SymmetricOperatorGenerator:
                     dim_curr = int(curr_ops.shape[1])
                     dim_prev = int(prev_ops.shape[1])
                     print(' ({}) Orthogonalized a vector space of dim {} against one with dim {}'.format(ind_output, dim_prev, dim_curr))
+
+
+
+    ##################### TODO
+    def _generate_cumulative(self, sparsification=True, orthogonalization=False, verbose=True, tol=1e-10):
+        raise NotImplementedError('Unfinished function.')
+        
+        num_inputs = len(self.input_symmetries)
+
+        if verbose:
+            print('===== GENERATING OPERATORS =====')
+            print(' STARTING WITH BASIS OF DIM {}'.format(len(self.basis)))
+            
+        # Go through the Operators or Transformations, one by one,
+        # in order, and find the null spaces of the (anti-)commutant matrix
+        # or the +/-1 eigenspaces of the symmetry matrix. Save the results.
+        for ind_input in range(num_inputs):
+            input_symmetry = self.input_symmetries[ind_input]
+            operation_mode = self.operation_modes[ind_input]
+
+            op_mode_print = ' COMMUTING WITH'
+            if operation_mode == 'anticommutator':
+                op_mode_print = ' ANTICOMMUTING WITH'
+            
+            if isinstance(input_symmetry, Operator):
+                if verbose:
+                    print('{} OPERATOR {}'.format(op_mode_print, ind_input+1))
+                
+                (output_ops, superoperator, eigvals, eigvecs) = commuting_operators(self.basis, input_symmetry, operation_mode=operation_mode, return_com_matrix=True, num_vecs=self.num_vecs, tol=tol)
+
+                self.superoperators.append(com_matrix)
+                self.eigenvectors.append(eigvecs)
+                self.eigenvalues.append(eigvals)
+                self.output_operators.append(output_ops)
+
+                if verbose:
+                    dim_output = int(self.output_operators[-1].shape[1])
+                    print('  Generated a vector space of operators of dimension: {}'.format(dim_output))
+                
+            elif isinstance(input_symmetry, Transformation):
+                if verbose:
+                    print('{} TRANSFORMATION {}'.format(op_mode_print, ind_input+1))
+                
+                (output_ops, superoperator, eigvals, eigvecs) = invariant_operators(self.basis, input_symmetry, operation_mode=operation_mode, return_sym_matrix=True, num_vecs=self.num_vecs, tol=tol)
+
+                self.superoperators.append(sym_matrix)
+                self.eigenvectors.append(eigvecs)
+                self.eigenvalues.append(eigvals)
+                self.output_operators.append(output_ops)
+
+                if verbose:
+                    dim_output = int(self.output_operators[-1].shape[1])
+                    print('  Generated a vector space of operators of dimension: {}'.format(dim_output))
+            else:
+                raise ValueError('Invalid input symmetry of type {}. Must be an Operator or a Transformation.'.format(type(input_symmetry)))
+
+    #################### TODO
+
+    def generate(self, sparsification=True, orthogonalization=False, verbose=True, tol=1e-10, mode='noncumulative'):
+        """Generate the operators in the given Basis,
+        that satisfy the given symmetries.
+
+        This procedure occurs in three steps:
+          1. *Generation:* In order, calculate the commutant matrix of 
+             Operator :math:`\hat{\mathcal{O}}` or the symmetry matrix 
+             of Transformation :math:`\hat{\mathcal{U}}` and diagonalize it.
+          2. *Projection:* In order, project the results for the previous 
+             symmetries onto the current symmetry.
+          3. *Sparsification:* (optional) In order, sparsify the vectors obtained from steps 1-2.
+          4. *Orthogonalization:* (optional) In reverse order, orthogonalize the results
+             for the later symmetries on the earlier symmetries.
+
+        The results of step 1 are stored in ``output_operators``, while the results
+        of steps 2 and 3 are stored in ``projected_output_operators``.
+
+        Parameters
+        ----------
+        sparsification : bool, optional
+            Specifies whether to perform step 4. Defaults to True.
+        orthogonalization : bool, optional
+            Specifies whether to perform step 3. Defaults to False.
+        verbose : bool, optional
+            Specifies whether to print the status of the operator generator.
+            Defaults to True.
+        tol : float, optional
+            Specifies the threshold used to consider whether an eigenvalue is
+            close to :math:`0,\pm 1`. Defaults to 1e-10.
+        """
+        
+        if mode == 'cumulative':
+            return self._generate_cumulative(sparsification=sparsification, orthogonalization=orthogonalization, verbose=verbose, tol=tol)
+        elif mode == 'noncumulative':
+            return self._generate_noncumulative(sparsification=sparsification, orthogonalization=orthogonalization, verbose=verbose, tol=tol)
+        else:
+            raise ValueError('Invalid operator generation mode: {}'.format(mode))

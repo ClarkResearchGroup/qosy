@@ -183,13 +183,13 @@ def cmp_to_key(mycmp):
     return K
 
 def swap(string, nameA, nameB):
-    """ Swap all occurences of nameA with nameB
+    """ Swap all occurances of nameA with nameB
     and vice-versa in the string.
 
     Parameters
     ----------
     string : str
-        The string to manipulate.
+        The string to modify.
     nameA : str
         The substring to replace with `nameB`.
     nameB : str
@@ -202,9 +202,9 @@ def swap(string, nameA, nameB):
 
     Examples
     --------
-        >>> swap('A Up B Dn', 'Up', 'Dn') # 'A Dn B Up'
-        >>> swap('X X A', 'X', 'Y') # 'Y Y A'
-        >>> swap('1 2 3', '1', '3') # '3 2 1'
+        >>> qosy.swap('A Up B Dn', 'Up', 'Dn') # 'A Dn B Up'
+        >>> qosy.swap('X X A', 'X', 'Y') # 'Y Y A'
+        >>> qosy.swap('1 2 3', '1', '3') # '3 2 1'
     """
     
     result = string.replace(nameA, '({})'.format(nameA))
@@ -324,6 +324,11 @@ def sparsify(vectors, orthogonalize=True, tol=1e-12):
     -------
     ndarray
         A matrix whose columns are the sparsified vectors.
+
+    Examples
+    --------
+        >>> vecs = np.array([[1.0/np.sqrt(2), 1.0],[1.0/np.sqrt(2), 0.0]])
+        >>> qosy.sparsify(vecs) # [[1,0],[0,1]]
     """
 
     num_vectors = int(vectors.shape[1])

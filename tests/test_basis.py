@@ -136,7 +136,7 @@ def test_distance_basis():
     N = 8
     
     # An open chain with two orbitals per unit cell.
-    chain_lattice = qy.lattice.chain(N, ['A', 'B'], periodic=False)
+    chain_lattice = qy.lattice.chain(N, orbital_names=['A', 'B'], periodic=False)
     
     k = 2
     R = 1

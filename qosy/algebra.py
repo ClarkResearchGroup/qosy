@@ -106,9 +106,9 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
         # Otherwise, they are real and cancel.
         else:
             coeff = 0.0
+            
+            
     elif op_type == 'Majorana':
-        r = num_non_trivial_differences
-        
         coeff1 *= coeff
         coeff2 *= np.conj(coeff) 
 
@@ -126,7 +126,7 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
     
     return (coeff, op_string_C)
 
-def _operation_operator(operatorA, operatorB, operation_mode='commutator'):
+def _operation_operator(operatorA, operatorB, operation_mode='commutator', tol=1e-12):
     """Perform an algebraic binary operation between
     two Operators.
     """
@@ -136,6 +136,9 @@ def _operation_operator(operatorA, operatorB, operation_mode='commutator'):
         for (coeffB, op_string_B) in operatorB:
             (coeffC, op_string) = _operation_opstring(op_string_A, op_string_B, operation_mode)
             coeff = coeffA*coeffB*coeffC
+
+            if np.abs(coeff) < tol:
+                continue
 
             if op_string in coeffs_of_opstrings:
                 coeffs_of_opstrings[op_string] += coeff

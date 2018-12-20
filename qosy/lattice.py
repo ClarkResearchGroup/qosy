@@ -232,11 +232,8 @@ class Lattice:
         """
 
         list_strings = []
-        for (position, orbital_names) in self._orbitals:
-            list_strings += [str(position)]
-            for orbital_name in orbital_names:
-                list_strings += [' ', str(orbital_name)]
-            list_strings += ['\n']
+        for (position, orbital_name, cell_coords) in self._orbitals:
+            list_strings += [str(position), ' ', str(cell_coords), ' ', str(orbital_name), '\n']
 
         result = ''.join(list_strings)
         return result
@@ -376,21 +373,106 @@ def show():
 
     plt.show()
 
+def cubic(d, num_cells, periodic_boundaries=None, orbital_names=None):
+    """Construct a :math:`d`-dimensional cubic lattice
+    with one atom per unit cell.
 
-def chain(N, orbital_names=None, periodic=False):
+    Parameters
+    ----------
+    d : int
+        The spatial dimension :math:`d` of the cubic lattice.
+    num_cells : tuple of int, (d,)
+        The number of unit cells to repeat in each dimension.
+    periodic_boundaries : tuple of bool, (d,), optional
+        Specifies whether the boundary conditions are periodic
+        or open in all spatial directions. Default is False (open)
+        in all directions.
+    orbital_names, list of hashable, (d,), optional
+        The names of the orbitals on each atom. Defaults
+        to a single orbital per atom with name ''.
+
+    Returns
+    -------
+    Lattice
+        A :math:`d`-dimensional cubic lattice.
+
+    Examples
+    --------
+    To create a 4x4x4 periodic 3D cubic lattice
+        >>> qosy.lattice.cubic(3, (4,4,4), periodic=(True,True,True))
+    """
+
+    if periodic_boundaries is None:
+        periodic_boundaries = (False,)*d
+
+    if orbital_names is None:
+        orbital_names = ['']
+    
+    # Lattice spacing
+    a  = 1.0
+    # Lattice vectors
+    lattice_vectors = []
+    for ind_dim in range(d):
+        lattice_vec = np.zeros(d)
+        lattice_vec[ind_dim] = a
+        lattice_vectors.append(lattice_vec)
+    
+    # Construct the unit cell: a single atom with many orbitals.
+    unit_cell = UnitCell(lattice_vectors)
+    unit_cell.add_atom(np.zeros(d), orbitals=orbital_names)
+    
+    # Construct the lattice.
+    lattice = Lattice(unit_cell, num_cells, periodic_boundaries=periodic_boundaries)
+
+    return lattice
+
+def square(N1, N2, periodic_boundaries=None, orbital_names=None):
+    """Construct a 2D square lattice.
+
+    Parameters
+    ----------
+    N1 : int
+        The number of unit cells in the 
+        directions of the :math:`a_1` lattice vector.
+    N2 : int
+        The number of unit cells in the 
+        directions of the :math:`a_2` lattice vector.
+    periodic_boundaries : (bool, bool), optional
+        The periodic boundary conditions in 
+        the directions of the lattice vectors. 
+        Defaults to (False, False).
+    orbital_names : list of hashable
+        The names of the orbitals in each unit cell if there
+        is more than one orbital per unit cell. Default is
+        one (unnamed) orbital per unit cell.
+
+    Returns
+    -------
+    Lattice
+        A 2D square lattice.
+
+    Examples
+    --------
+    To create a 4x4 toroidal square lattice
+        >>> qosy.lattice.square(4, 4, periodic_boundaries=(True,True))
+    """
+    
+    return cubic(2, (N1,N2), periodic_boundaries=periodic_boundaries, orbital_names=orbital_names)
+
+def chain(N, periodic=False, orbital_names=None):
     """Construct a 1D chain lattice.
 
     Parameters
     ----------
     N : int
         The number of unit cells in the chain.
+    periodic : bool, optional
+        Specifies whether the boundary condition is periodic
+        rather than open. Default is False (open).
     orbital_names : list of hashable
         The names of the orbitals in each unit cell if there
         is more than one orbital per unit cell. Default is
         one (unnamed) orbital per unit cell.
-    periodic : bool, optional
-        Specifies whether the boundary condition is periodic
-        rather than open. Default is False (open).
 
     Returns
     -------
@@ -402,30 +484,20 @@ def chain(N, orbital_names=None, periodic=False):
     To create a twelve site periodic chain
         >>> qosy.lattice.chain(12, periodic=True)
     """
-    
-    # Lattice spacing
-    a  = 1.0
-    # Lattice vector
-    a1 = a * np.array([1.0])
-    lattice_vectors = [a1]
 
-    # Construct the unit cell: a single atom with many orbitals.
-    unit_cell = UnitCell(lattice_vectors)
-    unit_cell.add_atom(np.zeros(1), orbital_names)
-    
-    # Construct the lattice.
-    lattice = Lattice(unit_cell, (N,), periodic_boundaries=(periodic,))
+    return cubic(1, (N,), periodic_boundaries=(periodic,), orbital_names=orbital_names)
 
-    return lattice
-    
 def kagome(N1, N2, periodic_boundaries=None):
     """Construct a 2D Kagome lattice.
 
     Parameters
     ----------
-    N1,N2 : int
+    N1 : int
         The number of unit cells in the 
-        directions of the lattice vectors.
+        directions of the :math:`a_1` lattice vector.
+    N2 : int
+        The number of unit cells in the 
+        directions of the :math:`a_2` lattice vector.
     periodic_boundaries : (bool, bool), optional
         The periodic boundary conditions in 
         the directions of the lattice vectors. 
