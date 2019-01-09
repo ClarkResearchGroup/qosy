@@ -4,6 +4,7 @@ This module provides miscellaneous methods that are helpful
 throughout ``qosy``.
 """
 
+import re
 import numpy as np
 import numpy.linalg as nla
 import scipy.linalg as sla
@@ -50,10 +51,10 @@ def sort_sign(vector, tol=1e-10):
         return (vec, 1)
 
 def compare(labelsI, labelsJ):
-    """Lexicographically compare two sets of labels, :math:`(i_1,\ldots,i_m)` 
-    and :math:`(j_1,\ldots,j_l)`. 
+    """Lexicographically compare two sets of labels, :math:`(i_1,\\ldots,i_m)` 
+    and :math:`(j_1,\\ldots,j_l)`. 
 
-    If :math:`m < l`, then :math:`(i_1,\ldots,i_m) < (j_1,\ldots,j_l)`. 
+    If :math:`m < l`, then :math:`(i_1,\\ldots,i_m) < (j_1,\\ldots,j_l)`. 
     If :math:`m = l`, then you compare :math:`i_1` and :math:`j_1`. 
     If those are equal, you compare :math:`i_2` and :math:`j_2`, and so on.
 
@@ -259,6 +260,34 @@ def swap(string, nameA, nameB):
 
     return result
 
+def replace(string, substitutions):
+    """ Perform many string replacements
+    all at once.
+
+    Parameters
+    ----------
+    string : str
+        The string to modify.
+    substitutions : dict of str to str
+        The string replacements to perform.
+
+    Returns
+    -------
+    str
+        The modified string.
+
+    Examples
+    --------
+        >>> qosy.tools.replace('ABC', {'A':'AB', 'B':'D', 'C':'AC'}) # 'ABDAC'
+    """
+    
+    # From https://gist.github.com/carlsmith/b2e6ba538ca6f58689b4c18f46fef11c
+    
+    substrings = sorted(substitutions, key=len, reverse=True)
+    regex      = re.compile('|'.join(map(re.escape, substrings)))
+
+    return regex.sub(lambda match: substitutions[match.group(0)], string)
+
 def gram_schmidt(matrix, tol=0.0):
     """Perform Gram-Schmidt decomposition.
 
@@ -323,7 +352,7 @@ def intersection(A, B, tol=1e-10):
     -------
     ndarray
         A matrix whose column vectors form 
-        an orthonormal basis of the vector space :math:`V\cap W`.
+        an orthonormal basis of the vector space :math:`V\\cap W`.
     """
     
     dimVS = int(A.shape[0])

@@ -12,8 +12,84 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from .basis import Operator
 from .conversion import convert
+from .tools import replace
 
-def print_vectors(basis, vectors, convert_to=None, norm_order=None):
+def relabel_orbitals(string, lattice):
+    """Relabel the operator string orbitals 
+    referenced in the given python string to 
+    the coordinates of the Lattice.
+
+    Parameters
+    ----------
+    string : str
+        A string that contains orbital labels.
+    lattice : Lattice
+        A lattice containing those orbitals.
+
+    Returns
+    -------
+    str
+        A new string with the orbital labels
+        replaced by those orbitals' coordinates
+        on the lattice.
+    """
+
+    num_orbitals = len(lattice)
+
+    substitutions = dict()
+    for orbital_label in np.arange(num_orbitals-1,-1,-1):
+        (lattice_pos, orb_name, unit_cell_coords) = lattice._orbitals[orbital_label]
+
+        """
+        # Compute the position of the atom within
+        # the unit cell.
+        unit_cell_pos = lattice_pos
+        for ind_dim in range(lattice.dim):
+            unit_cell_pos -= unit_cell_coords[ind_dim] * lattice.unit_cell.lattice_vectors[ind_dim]
+        """
+
+        # Compute the index of the atom within the
+        # unit cell.
+        unit_cell_num_orbitals  = num_orbitals // np.prod(lattice.num_cells)
+        unit_cell_orbital_index = orbital_label % unit_cell_num_orbitals
+
+        unit_cell_atom_index = 0
+        index1 = 0
+        for ind_atom in range(len(lattice.unit_cell.atom_orbitals)-1):
+            num_orbitals_on_atom = len(lattice.unit_cell.atom_orbitals[ind_atom])
+            index2 = index1 + num_orbitals_on_atom
+            
+            if index1 <= unit_cell_orbital_index and unit_cell_orbital_index < index2:
+                break
+
+            index1 = index2
+            unit_cell_atom_index += 1
+
+        # The information of the orbital with
+        # respect to the lattice:
+        # 1) its unit cell coordinate if there is more than
+        # one unit cell in the lattice.
+        orbital_info = '{'
+        if np.prod(lattice.num_cells) != 1:
+            orbital_info += str(unit_cell_coords)+'; '
+
+        # 2) The index of the atom in the unit cell.
+        orbital_info += str(unit_cell_atom_index) #np.array2string(unit_cell_pos,precision=3) 
+
+        # 3) Any extra orbital information (like "Up" or "Dn"
+        # for spin-1/2 orbitals).
+        if orb_name !='':
+            orbital_info += '; '+orb_name+'}'
+        else:
+            orbital_info += '}'
+        
+        substitutions[' '+str(orbital_label)] = '_'+str(orbital_info)
+    
+    result = replace(string, substitutions)
+    
+    return result
+        
+def print_vectors(basis, vectors, lattice=None, convert_to=None, norm_order=None):
     """Print in human-readable form the vectors
     as Operators in the given Basis.
     
@@ -24,6 +100,9 @@ def print_vectors(basis, vectors, convert_to=None, norm_order=None):
         is represented in.
     vectors : ndarray
         The vectors to print.
+    lattice : Lattice, optional
+        If provided, convert orbital labels to 
+        lattice coordinate labels. Defaults to None.
     convert_to : str, optional
         If not None, convert OperatorStrings to the given type
         before printing. Defaults to None.
@@ -49,16 +128,25 @@ def print_vectors(basis, vectors, convert_to=None, norm_order=None):
         cleaned_operator = operator.remove_zeros()
         cleaned_operator.normalize(order=norm_order)
         print('vector {} = '.format(ind_vec))
-        print(cleaned_operator)
+
+        output_string = str(cleaned_operator)
+        if lattice is not None:
+            output_string = relabel_orbitals(output_string, lattice)
+        
+        print(output_string)
+        
         ind_vec += 1
 
-def print_operators(operators, convert_to=None, norm_order=None):
+def print_operators(operators, lattice=None, convert_to=None, norm_order=None):
     """Print in human-readable form a list of Operators.
     
     Parameters
     ----------
     operators : list of Operators
         The Operators to print.
+    lattice : Lattice, optional
+        If provided, convert orbital labels to 
+        lattice coordinate labels. Defaults to None.
     convert_to : str, optional
         If not None, convert OperatorStrings to the given type
         before printing. Defaults to None.
@@ -78,8 +166,15 @@ def print_operators(operators, convert_to=None, norm_order=None):
     for operator in operators_to_print:
         cleaned_operator = operator.remove_zeros()
         cleaned_operator.normalize(order=norm_order)
+
         print('operator {} = '.format(ind_vec))
-        print(cleaned_operator)
+
+        output_string = str(cleaned_operator)
+        if lattice is not None:
+            output_string = relabel_orbitals(output_string, lattice)
+        
+        print(output_string)
+
         ind_vec += 1
 
 def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seitz=True):
@@ -93,8 +188,8 @@ def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seit
         The lattice to plot.
     with_labels : bool, optional
         Specifies whether to annotate 
-        each lattice point with its 
-        label. False by default.
+        each orbital with its 
+        integer label. False by default.
     with_lattice_vectors : bool, optional
         Specifies whether to plot the lattice 
         vectors. True by default. 

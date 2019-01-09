@@ -369,7 +369,7 @@ def chain(N, periodic=False, orbital_names=None):
 
     return cubic(1, (N,), periodic_boundaries=(periodic,), orbital_names=orbital_names)
 
-def kagome(N1, N2, periodic_boundaries=None):
+def kagome(N1, N2, periodic_boundaries=None, orbital_names=None):
     """Construct a 2D Kagome lattice.
 
     Parameters
@@ -384,6 +384,10 @@ def kagome(N1, N2, periodic_boundaries=None):
         The periodic boundary conditions in 
         the directions of the lattice vectors. 
         Defaults to (False, False).
+    orbital_names : list of hashable
+        The names of the orbitals in each unit cell if there
+        is more than one orbital per unit cell. Default is
+        one (unnamed) orbital per unit cell.
 
     Returns
     -------
@@ -416,7 +420,7 @@ def kagome(N1, N2, periodic_boundaries=None):
     # Construct the unit cell.
     unit_cell = UnitCell(lattice_vectors)
     for atom_position in positions:
-        unit_cell.add_atom(atom_position)
+        unit_cell.add_atom(atom_position, orbitals=orbital_names)
     
     # Construct the lattice.
     lattice = Lattice(unit_cell, (N1,N2), periodic_boundaries=periodic_boundaries)

@@ -34,6 +34,9 @@ def test_swap():
     assert(qy.tools.swap('Up Up Dn', 'Up', 'Dn') == 'Dn Dn Up')
     assert(qy.tools.swap('Up Up Dn', 'Dn', 'Up') == 'Dn Dn Up')
     assert(qy.tools.swap('1 2 3', 'X', 'Y') == '1 2 3')
+
+def test_replace():
+    assert(qy.tools.replace('ABC', {'A':'AB', 'B':'D', 'C':'AC'}) == 'ABDAC')
     
 def test_maximal_cliques():
     # Toy graph on https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
