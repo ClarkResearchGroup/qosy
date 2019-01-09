@@ -327,13 +327,6 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
     else:
         return result
 
-"""
-def killing_form(basis):
-    (s_constants, _) = structure_constants(basis, basis)
-    
-    # TODO
-"""
-
 def _commutant_matrix_opstrings(basis, operator, operation_mode):
     """Compute the commutant matrix given a Basis of OperatorStrings.
     """
@@ -434,4 +427,199 @@ def commutant_matrix(basis, operator, operation_mode='commutator'):
         return _commutant_matrix_opstrings(basis, operator, operation_mode)
     elif isinstance(basis, list) and isinstance(basis[0], Operator):
         return _commutant_matrix_operators(basis, operator, operation_mode)
+    else:
+        raise ValueError('Invalid basis type: {}'.format(type(basis)))
     
+# TODO: finish
+def generate_lie_algebra(operators, tol=1e-12):
+    """Construct the Lie algebra generated
+    by the given basis of Hermitian operators.
+
+    Parameters
+    ----------
+    operators : Basis or list of Operators
+        The Basis of OperatorStrings or 
+        list of Operators to generate the 
+        Lie algebra from.
+    tol : float
+        Tolerance with which to consider
+        numbers zero. Defaults to 1e-12.
+
+    Returns
+    -------
+    Basis or list of Operators
+        All of the Lie algebra generators in
+        the same format as ``operators``.
+    """
+    
+    raise NotImplementedError('Not finished yet.')
+    
+    if isinstance(operators, Basis):
+        pass
+    elif isinstance(operators, list) and isinstance(operators[0], Operator):
+        num_operators = len(operators)
+        
+        combined_basis = Basis()
+        for op in operators:
+            combined_basis += operators._basis
+
+        row_inds = []
+        col_inds = []
+        data     = []
+        for ind_op in range(num_operators):
+            for (coeff, op_string) in operators[ind_op]:
+                ind_os = combined_basis.index(op_string)
+
+                if np.abs(coeff) > tol:
+                    row_inds.append(ind_os)
+                    col_inds.append(ind_op)
+                    data.append(coeff)
+
+        # Express the operators as vectors
+        # in the combined_basis.
+        vectors = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(combined_basis), num_operators))
+
+        # The projection onto the vector space
+        # spanned by vectors.
+        vecsHvecs_inv = ssla.inv((vectors.H).dot(vectors))
+        projector     = vectors.dot(vecsHvecs_inv.dot(vectors.H))
+        
+        new_operators = []
+        for indA in range(num_operators):
+            for indB in range(indA+1, num_operators):
+                opA = operators[indA]
+                opB = operators[indB]
+                
+                opC = commutator(opA, opB)
+                
+                # TODO: check whether opC is in the vector space
+                # spanned by vectors.
+                vecC    = ss.csc_matrix(opC.to_vector(combined_basis))
+                overlap = (vecC.H).dot(projector.dot(vecC))
+
+                # TODO: is it possible for opC to be a
+                # linear combination of operators in
+                # new_operators but not the original
+                # operators?
+                if np.abs(overlap - 1.0) < tol:
+                    new_operators.append(opC)
+    else:
+        raise ValueError('Invalid operators type: {}'.format(type(operators)))
+
+# TODO: test
+def killing_form(operators):
+    """Compute the Killing form 
+    :math:`K_{ab}=\sum_{cd} N_{ac}^d N_{bd}^c`
+    for the given operators :math:`\hat{h}_a` 
+    with structure constants :math:`N_{ab}^c`.
+
+    Parameters
+    ----------
+    operators : Basis or list of Operators
+        The Basis of OperatorStrings or list 
+        of Operators :math:`\hat{h}_a`.
+
+    Returns
+    -------
+    scipy.sparse.csc_matrix
+        The Killing form :math:`K_{ab}`.
+    """
+
+    raise NotImplementedError('Not finished yet.')
+    
+    if isinstance(operators, Basis):
+        # s_constants = [S_{bc}^{(1)}, S_{bc}^{(2)}, ...]
+        # N_{ab}^c = S_{ac}^{(b)} = -N_{ba}^c = -S_{bc}^{(a)}
+        (s_constants, _) = structure_constants(operators, operators)
+
+        dim_a = len(s_constants)
+        dim_b = dim_a
+        dim_c = int(s_constants[0].shape[1])
+        
+        # M_{a,(bc)} = N_{ab}^c = -N_{ba}^c = -S_{bc}^{(a)}
+        row_inds    = []
+        col_inds_bc = []
+        col_inds_cb = []
+        data        = []
+        for ind_a in range(dim_a):
+            for (ind_b, ind_c) in s_constants[ind_a].nonzero():
+                col_ind_bc = ind_b*dim_b + ind_c
+                col_ind_cb = ind_c*dim_c + ind_b
+
+                row_inds.append(ind_a)
+                col_inds_bc.append(col_ind_bc)
+                col_inds_cb.append(col_ind_cb)
+
+                data.append(-s_constants[ind_a][ind_b, ind_c])
+
+        # M_{a,(bc)}
+        matrix1 = ss.csc_matrix((data, (row_inds, col_inds_bc)), dtype=complex, shape=(dim_a, dim_b*dim_c))
+        # M_{(cb),a}
+        matrix1 = ss.csc_matrix((data, (col_inds_cb, row_inds)), dtype=complex, shape=(dim_b*dim_c, dim_a))
+
+        # K_{ab} = \sum_{cd} M_{a(cd)} M_{b(dc)}
+        killing = matrix_bc.dot(matrix_cb)
+        
+        return killing
+    elif isinstance(operators, list) and isinstance(operators[0], Operator):
+        pass
+    else:
+        raise ValueError('Invalid type of operators: {}'.format(type(operators)))
+
+# TODO: test
+def generate_center(operators, tol=1e-10):
+    """Construct the center of the Lie algebra 
+    generated by the given operators.
+    
+    Parameters
+    ----------
+    operators : Basis or list of Operators
+        The Basis of OperatorStrings or 
+        list of Operators that generate a
+        Lie algebra.
+    tol : float, optional
+        The tolerance with which to consider
+        eigenvalues to be zero. Defaults to 1e-10.
+
+    Returns
+    -------
+    list of Operators
+        The generators of the center of the Lie algebra.
+    """
+    
+    raise NotImplementedError('Not finished yet.')
+
+    # Compute the Killing form.
+    killing = killing_form(operators)
+
+    # Find the null vectors of the Killing form.
+    (evals, evecs) = nla.eigh(killing)
+    inds_ns = np.where(np.abs(evals) < tol)[0]
+    null_space = evecs[:, inds_ns]
+
+    num_null_vecs = int(null_space.shape[1])
+
+    # From the null vectors, construct a
+    # list of Operators that form the center
+    # of the Lie algebra.
+    center_operators = []
+    for ind_vec in range(num_null_vecs):
+        if isinstance(operators, list) and isinstance(operators[0], Operator):
+            center_op = Operator([], [], operators[0].op_type)
+            for ind_basis in range(len(operators)):
+                coeff = null_space[ind_basis, ind_vec]
+            
+                center_op += coeff * operators[ind_basis]
+
+            center_op.remove_zeros()
+            center_op.normalize()
+        elif isinstance(operators, Basis):
+            center_op = Operator(null_space[:, ind_vec], operators)
+            center_op.remove_zeros()
+            center_op.normalize()
+        else:
+            raise ValueError('Invalid operators type: {}'.format(type(operators)))
+        
+        center_operators.append(center_op)
+
+    return center_operators

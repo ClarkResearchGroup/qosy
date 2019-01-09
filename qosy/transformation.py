@@ -136,7 +136,31 @@ class Transformation:
         """
         
         product_info = (other.rule, other.info, self.rule, self.info)
-        return Transformation(Transformation._product_rule, product_info)      
+        return Transformation(Transformation._product_rule, product_info)
+
+    def __pow__(self, number):
+        """Take the Transformation :math:`\hat{\mathcal{U}}` to the given power.
+
+        Parameters
+        ----------
+        number : int
+            The number of times :math:`n` to apply this Transformation.
+            Must be non-negative.
+
+        Returns
+        -------
+        Transformation
+            :math:`\hat{\mathcal{U}}^n`
+        """
+
+        if type(number) is not int or number <= 0:
+            raise ValueError('Invalid number: {}'.format(number))
+
+        result = self
+        for ind in range(number-1):
+            result = result * self
+
+        return result
 
 def _permutation_rule(op_string_A, info):
     """Transformation rule to perform a permutation of orbital labels.

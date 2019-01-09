@@ -421,6 +421,30 @@ class Operator:
         
         self.coeffs /= self.norm(order=order)
 
+    def to_vector(self, basis):
+        """Convert the Operator to a vector
+        in the given Basis of OperatorStrings.
+
+        Parameters
+        ----------
+        basis : Basis
+            The Basis of OperatorStrings in which
+            to represent the Operator as a vector.
+
+        Returns
+        -------
+        ndarray
+            The vector representation of the Operator.
+        """
+
+        vector = np.zeros(len(basis), dtype=complex)
+        
+        for (coeff, op_string) in self:
+            ind_vec = basis.index(op_string)
+            vector[ind_vec] = coeff
+
+        return vector
+        
     def __add__(self, other):
         """Add an Operator to this Operator.
 
@@ -812,9 +836,20 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     
     return Basis(op_strings)
 
-def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
-    """Constructs a Basis of OperatorStrings made of orbitals
-    that are spatially local.
+def _symmetrize_opstring(op_string, symmetry_group):
+    """From an operator string h_a and a symmetry group G,
+    computes a symmetrized operator \sum_{g \in G} g h_a.
+    """
+    
+    symmetrized_op = Operator([], [], op_string.op_type)
+    for g in symmetry_group:
+        symmetrized_op += g.apply(op_string)
+
+    return symmetrized_op
+
+def distance_basis(lattice, k, R, op_type, points=None, include_identity=False, tol=1e-10):
+    """Constructs a Basis of OperatorStrings 
+    made of orbitals that are spatially local.
 
     Parameters
     ----------
@@ -824,8 +859,17 @@ def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
         Specifies the allowed support of OperatorStrings in the
         Basis. If k is an integer, then OperatorStrings can have 
         support up to k. If a list or array, then OperatorStrings
-        can only have support on the given numbers of orbitals.    R : float
+        can only have support on the given numbers of orbitals.    
+    R : float
         The maximum spatial distance between orbitals in an OperatorString.
+    op_type : str
+        The type of OperatorStrings in the Basis: 
+        'Pauli', 'Fermion', or 'Majorana'.
+    points : list of ndarray, optional
+        If provided, the OperatorStrings in the Basis must
+        be at most a distance R away from these points rather
+        than the positions of the atoms in the lattice.
+        Defaults to None.
     include_identity : bool, optional
         Specifies whether to include the identity operator in the Basis.
         The default is to not include it to keep the Basis's OperatorStrings 
@@ -845,7 +889,7 @@ def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
     made of nearest and next-nearest neighbor Pauli strings on 
     a periodic chain of twelve sites, one can use
         >>> lattice = qosy.chain_lattice(12, periodic=True)
-        >>> basis   = distance_basis(lattice, 2, 2.0, 'Pauli')
+        >>> basis   = qosy.distance_basis(lattice, 2, 2.0, 'Pauli')
     """
 
     # Store the distances between the orbitals into a matrix.
@@ -873,3 +917,48 @@ def distance_basis(lattice, k, R, op_type, include_identity=False, tol=1e-10):
         total_basis += cluster_basis(k, cluster_labels, op_type)
         
     return total_basis
+
+# TODO: test
+def symmetrize(basis, symmetry_group, tol=1e-10):
+    """Symmetrize a basis so that its basis
+    vectors are invariant under the given
+    discrete symmetries.
+
+    Parameters
+    ----------
+    basis : Basis
+        The Basis of OperatorStrings to symmetrize.
+    symmetry_group : list of Transformations
+        All of the desired discrete symmetry 
+        transformations of the symmetry group.
+    tol : float, optional
+        The tolerance used to compare distances 
+        between orbitals. Default is 1e-10.
+
+    Returns
+    -------
+    list of Operators
+        The symmetrized basis, represented as a 
+        list of Operators. Each Operator obeys 
+        the given space group symmetries.
+    """
+
+    # The symmetrized basis will be a list of Operators
+    # that obey the given discrete group symmetries.
+    symmetrized_basis  = []
+    visited_op_strings = set()
+    for op_string in basis:
+        if op_string in visited_op_strings:
+            continue
+        
+        symmetrized_op = _symmetrize_opstring(op_string, symmetry_group)
+
+        for (coeff, visited_op_string) in symmetrized_op:
+            visited_op_strings.add(visited_op_string)
+            
+        symmetrized_op.remove_zeros()
+        symmetrized_op.normalize()
+
+        symmetrized_basis.append(symmetrized_op)
+        
+    return symmetrized_basis

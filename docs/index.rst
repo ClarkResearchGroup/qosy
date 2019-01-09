@@ -37,6 +37,8 @@ Description of available modules
   Provides methods for constructing operators with desired continuous and discrete symmetries.
 :py:mod:`qosy.lattice`
   Defines UnitCell and Lattice objects useful for analyzing crystalline systems.
+:py:mod:`qosy.visualization`
+  Provides tools for plotting and printing lattices and operators defined on lattices.
 :py:mod:`qosy.tools`
   Provides convenience functions for ``qosy``.
 

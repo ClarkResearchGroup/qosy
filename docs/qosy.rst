@@ -4,78 +4,35 @@ qosy package
 Submodules
 ----------
 
-qosy.algebra module
+:py:mod:`qosy.algebra` module
 -------------------
 
-.. automodule:: qosy.algebra
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.basis module
+:py:mod:`qosy.basis` module
 -----------------
 
-.. automodule:: qosy.basis
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.config module
+:py:mod:`qosy.config` module
 ------------------
 
-.. automodule:: qosy.config
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.conversion module
+:py:mod:`qosy.conversion` module
 ----------------------
 
-.. automodule:: qosy.conversion
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.core module
+:py:mod:`qosy.core` module
 ----------------
 
-.. automodule:: qosy.core
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.lattice module
+:py:mod:`qosy.lattice` module
 -------------------
 
-.. automodule:: qosy.lattice
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.operatorstring module
+:py:mod:`qosy.operatorstring` module
 --------------------------
 
-.. automodule:: qosy.operatorstring
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.tools module
+:py:mod:`qosy.tools` module
 -----------------
 
-.. automodule:: qosy.tools
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-qosy.transformation module
+:py:mod:`qosy.transformation` module
 --------------------------
 
-.. automodule:: qosy.transformation
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
+:py:mod:`qosy.visualization` module
+--------------------------
 
 Module contents
 ---------------

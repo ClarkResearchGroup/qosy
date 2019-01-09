@@ -5,11 +5,13 @@ conveniently handle the indexing of orbitals in a crystalline
 lattice of atoms.
 """
 
+import copy
 import itertools as it
 import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-                
+import numpy.linalg as nla
+
+from .tools import argsort, remove_duplicates
+
 class UnitCell:
     """A UnitCell object represents a unit cell of atoms
     with orbitals on the atoms.
@@ -96,8 +98,6 @@ class Lattice:
         # the index in the self._orbitals list.
         # Ex: self._indices_orbitals[('array([2 0])', 'A')] = 2
         self._indices_orbitals = dict()
-        
-        # Dictionary that maps 
 
         ranges       = tuple([range(num_cell) for num_cell in num_cells])
         coords_cells = list(it.product(*ranges))
@@ -174,25 +174,42 @@ class Lattice:
             
         return -1
         
-    def distance(self, index1, index2):
-        """Compute the minimum distance between two orbitals with
-        the given indices.
+    def distance(self, position1, position2):
+        """Compute the minimum distance between
+        two positions in the given lattice.
 
         Parameters
         ----------
-        index1 : int
-            The index of the first orbital.
-        index2 : int
-            The index of the second orbital.
+        position1 : ndarray or int
+            The spatial position in the lattice
+            or the index of the orbital whose postiion
+            to use.
+        position2 : ndarray or int
+            The spatial position in the lattice
+            or the index of the orbital whose postiion
+            to use.
 
         Returns
         -------
-            The closest distance between the first and second orbital.
+            The closest distance between the two positions.
+
+        Notes
+        -----
+        At least one of the two positions needs to be within
+        the boundaries of the lattice for the periodic
+        boundaries to be computed correctly.
         """
 
-        (pos1, orbital_name1, cell_coords1) = self._orbitals[index1]
-        (pos2, orbital_name2, cell_coords2) = self._orbitals[index2]
-        
+        if type(position1) is int:
+            (pos1, _, _) = self._orbitals[position1]
+        else:
+            pos1 = position1
+            
+        if type(position2) is int:
+            (pos2, _, _) = self._orbitals[position2]
+        else:
+            pos2 = position2
+            
         mirror_distances = [np.linalg.norm((pos1+bv)-pos2) for bv in self._boundary_vectors]
         return np.min(mirror_distances)
     
@@ -237,141 +254,6 @@ class Lattice:
 
         result = ''.join(list_strings)
         return result
-
-def plot(lattice, with_labels=False):
-    """Plot the lattice represented by the 
-    Lattice object. Plots the unit cell that 
-    tiles the lattice in a separate color.
-
-    Parameters
-    ----------
-    lattice : Lattice
-        The lattice to plot.
-    with_labels : bool, optional
-        Annotate each lattice point with its 
-        label if True. False by default.
-    
-    Examples
-    --------
-       >>> qosy.plot(lattice)
-       >>> qosy.show()
-    """
-    
-    if lattice.dim == 1:
-        # Plot the first unit cell separately.
-        x_uc = []
-        y_uc = []
-        for position in lattice.unit_cell.atom_positions:
-            x_uc.append(position[0])
-            y_uc.append(0.0)
-
-        plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
-
-        xs = []
-        ys = []
-        names = []
-        label = 0
-        for (position, orbital_name, cell_coords) in lattice:
-            xs.append(position[0])
-            ys.append(0.0)
-            names.append('{}'.format(label))
-            label += 1
-            
-        plt.plot(xs, ys, 'ko', markeredgecolor='k', markersize=8)
-
-        if with_labels:
-            for (x,y,name) in zip(xs,ys,names):
-                plt.annotate(name, xy=(x,y), color='b')
-
-        plt.xlim(np.min(xs)-1, np.max(xs)+1)
-        plt.ylim(-1,1)
-
-        plt.xlabel('$x$')
-        plt.axis('equal')
-                
-    elif lattice.dim == 2:
-        # Plot the first unit cell separately.
-        x_uc = []
-        y_uc = []
-        for position in lattice.unit_cell.atom_positions:
-            x_uc.append(position[0])
-            y_uc.append(position[1])
-    
-        plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
-                
-        xs = []
-        ys = []
-        names = []
-        label = 0
-        for (position, orbital_name, cell_coords) in lattice:
-            xs.append(position[0])
-            ys.append(position[1])
-            names.append('{}'.format(label))
-            label += 1
-            
-        plt.plot(xs, ys, 'ko', markeredgecolor='k', markersize=8)
-
-        if with_labels:
-            for (x,y,name) in zip(xs,ys,names):
-                plt.annotate(name, xy=(x,y), color='b')
-        
-        plt.xlim(np.min(xs)-1, np.max(xs)+1)
-        plt.xlim(np.min(ys)-1, np.max(ys)+1)
-
-
-        plt.xlabel('$x$')
-        plt.ylabel('$y$')
-        plt.axis('equal')
-        
-    elif lattice.dim == 3:
-        fig = plt.gcf()
-        ax  = fig.add_subplot(111, projection='3d')
-        
-        # Plot the first unit cell separately.
-        x_uc = []
-        y_uc = []
-        z_uc = []
-        for position in lattice.unit_cell.atom_positions:
-            x_uc.append(position[0])
-            y_uc.append(position[1])
-            z_uc.append(position[2])
-
-        ax.scatter(x_uc, y_uc, z_uc, c='r', marker='s')
-
-        xs = []
-        ys = []
-        zs = []
-        names = []
-        label = 0
-        for (position, orbital_name, cell_coords) in lattice:
-            xs.append(position[0])
-            ys.append(position[1])
-            zs.append(position[2])
-            names.append(str(label))
-            label += 1
-            
-        ax.scatter(xs, ys, zs, c='k', marker='o')
-        ax.set_xlabel('$x$')
-        ax.set_ylabel('$y$')
-        ax.set_zlabel('$z$')
-        
-        if with_labels:
-            label = 0
-            for (pos_atom, orbitals_atom) in zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals):
-                labels_atom = []
-                for orbital in orbitals_atom:
-                    labels_atom.append(label)
-                    label += 1
-                
-                ax.text(pos_atom[0], pos_atom[1], pos_atom[2], str(labels_atom), size=20, zorder=1)
-    else:
-        raise ValueError('Cannot plot a {}-dimensional lattice.'.format(lattice.dim))
-    
-def show():
-    """Display a figure.
-    """
-
-    plt.show()
 
 def cubic(d, num_cells, periodic_boundaries=None, orbital_names=None):
     """Construct a :math:`d`-dimensional cubic lattice
@@ -541,9 +423,193 @@ def kagome(N1, N2, periodic_boundaries=None):
 
     return lattice
 
-# TODO
-#def symmetrize(unit_cell, space_group_symmetries):
-    # Construct a new, larger unit cell with the given
-    # space group symmetries.
+def _symmetrize_atoms(lattice, G, tol=1e-12):
+    # Helper function to `symmetrize`. Constructs
+    # a new lattice with all atoms (and their orbitals)
+    # symmetrized by the symmetry group transformations.
 
+    sym_atom_info = list(zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals))
+    
+    result = []
+    for (pos, orbs) in sym_atom_info:
+        for g in G:
+            new_pos = np.dot(g, pos)
+            
+            result.append((new_pos, orbs))
+
+    sym_atom_info = result
+
+    # Sort the atom positions
+    # by their distance from the origin.
+    # Break ties by considering the distance
+    # from the origin along each axis.
+    distances = [(nla.norm(pos),)+tuple(np.abs(pos))+tuple(pos) for (pos, _) in sym_atom_info]
+    def _comp(ind1, ind2):
+        tup1 = distances[ind1]
+        tup2 = distances[ind2]
+
+        # Ignore equal entries.
+        comparison_vec = np.abs(np.array(tup1) - np.array(tup2)) < tol
+        index_tup = 0
+        while comparison_vec[index_tup] and index_tup < len(tup1)-1:
+            index_tup += 1
+
+        # Use the last unequal entry for comparison.
+        if comparison_vec[index_tup]:
+            return 0
+        else:
+            return tup1[index_tup] - tup2[index_tup]
+        
+    inds_sort = argsort(distances, comp=_comp)
+    sym_atom_info = [sym_atom_info[ind] for ind in inds_sort]
+    
+    # Construct the unit cell.
+    new_unit_cell = UnitCell(lattice.unit_cell.lattice_vectors)
+    for (pos, orbs) in sym_atom_info:
+        new_unit_cell.add_atom(pos, orbs)
+    
+    # Construct the lattice.
+    new_lattice = Lattice(new_unit_cell, (1,)*lattice.dim, periodic_boundaries=lattice.periodic_boundaries)
+
+    return new_lattice
+
+def _expand_lattice(lattice, ind_lattice_vector, delta):
+    # Helper function to `symmetrize`. Expands
+    # the lattice in a given lattice vector
+    # direction.
+
+    # First, extend the specified lattice vector
+    # by the given amount.
+    lattice.unit_cell.lattice_vectors[ind_lattice_vector] += delta
+
+    # Second, enlarge the unit cell by shifting all
+    # atoms in the unit cell by this amount as well.
+    new_atom_pos  = list(lattice.unit_cell.atom_positions) \
+                    + [delta + pos for pos in lattice.unit_cell.atom_positions]
+    new_atom_orbs = list(lattice.unit_cell.atom_orbitals)*2
+
+    new_unit_cell = UnitCell(lattice.unit_cell.lattice_vectors,
+                             atom_positions=new_atom_pos,
+                             atom_orbitals=new_atom_orbs)
+
+    new_lattice = Lattice(new_unit_cell, (1,)*lattice.dim, periodic_boundaries=lattice.periodic_boundaries)
+
+    return new_lattice
+
+def _remove_duplicate_atoms(lattice, tol=1e-12):
+    # Helper function for `symmetrize`.
+    # Returns a new lattice with the
+    # duplicate atoms from the lattice
+    # removed.
+
+    sym_atom_info = list(zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals))
+
+    # Function for comparing equality of atoms.
+    # Compares their positions and orbitals in
+    # the lattice.
+    def _equiv(infoA, infoB):
+        (posA, orbsA) = infoA
+        (posB, orbsB) = infoB
+        return lattice.distance(posA, posB) < tol and orbsA == orbsB
+
+    # Remove duplicate atoms.
+    sym_atom_info = remove_duplicates(sym_atom_info, equiv=_equiv)
+    
+    # Construct the unit cell.
+    new_unit_cell = UnitCell(lattice.unit_cell.lattice_vectors)
+    for (pos, orbs) in sym_atom_info:
+        new_unit_cell.add_atom(pos, orbs)
+    
+    # Construct the lattice.
+    new_lattice = Lattice(new_unit_cell, (1,)*lattice.dim, periodic_boundaries=lattice.periodic_boundaries)
+
+    return new_lattice
+    
+# TODO: test
+def symmetrize(lattice, point_group_generators, num_expansions=1, tol=1e-12):
+    """Construct a lattice with a
+    new, larger unit cell that is 
+    invariant under the given
+    point group symmetries.
+
+    Parameters
+    ----------
+    lattice : Lattice
+        The lattice to symmetrize.
+    point_group_generators : list of ndarray
+        The discrete point group symmetry
+        transformations that generator the 
+        symmetry group, represented by matrices.
+    num_expansions : int, optional
+        The number of times to attempt to
+        enlarge the unit cell. Defaults to 1.
+    tol : float, optional
+        The tolerance within which to consider
+        positions equivalent. Defaults to 1e-12.
+
+    Returns
+    -------
+    Lattice
+        The symmetrized lattice with an
+        enlarged unit cell with the desired 
+        symmetries.
+
+    Notes
+    -----
+    This function performs the simplest
+    possible expansion of the original unit
+    cell. Namely, it expands each lattice
+    vector. This will miss certain unit
+    cells that also obey the given point
+    group.
+    """
+
+    # The original lattice's unit cell
+    unit_cell = lattice.unit_cell
+    
+    # The spatial dimension
+    dim = lattice.dim
+
+    # Construct the point group G from its generators.
+    G = [np.eye(dim)]
+    newG = G + point_group_generators
+    while len(newG) != len(G):
+        G = newG
+        
+        # Generate new group elements, potentially with duplicates
+        newG = [np.dot(g,gen) for g in G for gen in point_group_generators]
+        # Remove the duplicates
+        newG = remove_duplicates(newG)
+
+    # Store the original lattice.
+    orig_lattice         = copy.deepcopy(lattice)
+    orig_lattice_vectors = copy.deepcopy(orig_lattice.unit_cell.lattice_vectors)
+        
+    # Build the new unit cell by symmetrizing
+    # the old unit cell.
+    old_lattice = copy.deepcopy(lattice)
+
+    # Expand and symmetrize the unit cell.
+    for ind_expansion in range(num_expansions):
+        # Expand the lattice in the direction of each
+        # lattice vector.
+        for ind_lv in range(len(orig_lattice_vectors)):
+            delta = orig_lattice_vectors[ind_lv]
+
+            # Expand the lattice in the direction of delta.
+            new_lattice = _expand_lattice(old_lattice, ind_lv, delta)
+        
+        # Symmetrize the atom positions for the new
+        # unit cell.
+        new_lattice = _symmetrize_atoms(new_lattice, G, tol=tol)
+
+        # Remove the duplicate atoms equivalent to
+        # one another by lattice translations
+        # by the new lattice vectors.
+        new_lattice = _remove_duplicate_atoms(new_lattice, tol=tol)
+
+        # Update the old lattice.
+        old_lattice = new_lattice
+    
+    return new_lattice
     

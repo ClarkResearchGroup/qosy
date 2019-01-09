@@ -143,23 +143,6 @@ def maximal_cliques(adjacency_lists):
 
     return cliques
 
-def argsort(mylist):
-    """Returns the indices that sort a list.
-
-    Parameters
-    ----------
-    list of comparable objects
-        List to sort.
-
-    Returns
-    -------
-    list of int
-        The permutation that sorts the list.
-    """
-
-    # Based on https://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python
-    return sorted(range(len(mylist)), key=mylist.__getitem__)
-
 def cmp_to_key(mycmp):
     """Convert a cmp= function into a key= function.
     """
@@ -181,6 +164,69 @@ def cmp_to_key(mycmp):
         def __ne__(self, other):
             return mycmp(self.obj, other.obj) != 0
     return K
+
+def argsort(mylist, comp=None):
+    """Returns the indices that sort a list.
+
+    Parameters
+    ----------
+    mylist : list of objects
+        List to sort.
+    comp : function, optional
+        A comparison function used
+        to compare two objects in the list.
+        Defaults to None.
+
+    Returns
+    -------
+    list of int
+        The permutation that sorts the list.
+    """
+
+    # Based on https://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python
+
+    if comp is None:
+        return sorted(range(len(mylist)), key=mylist.__getitem__)
+    else:
+        return sorted(range(len(mylist)), key=cmp_to_key(comp))
+
+def remove_duplicates(objects, equiv=None, tol=1e-12):
+    """Remove duplicate objects from
+    a list of objects.
+
+    Parameters
+    ----------
+    objects : list of objects
+        A list of objects, 
+        with possible duplicates.
+    equiv : function, optional
+        A function for checking equality
+        of objects. Defaults to numpy.allclose
+        for numpy arrays.
+    tol : float, optional
+        The tolerance within which to
+        consider numpy arrays
+        identical. Defaults to 1e-12.
+    
+    Returns
+    -------
+    list of objects
+        The list with duplicates removed.
+    """
+
+    # Based on answer from https://stackoverflow.com/questions/27751072/removing-duplicates-from-a-list-of-numpy-arrays
+
+    if equiv is None:
+        def _equiv(objA, objB):
+            return np.allclose(objA, objB, atol=tol)
+        equiv = _equiv
+    
+    uniques = []
+    for obj in objects:
+        if not any(equiv(obj, unique_obj) for unique_obj in uniques):
+            uniques.append(obj)
+    
+    return uniques
 
 def swap(string, nameA, nameB):
     """ Swap all occurances of nameA with nameB

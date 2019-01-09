@@ -32,19 +32,19 @@ from .transformation import Transformation, symmetry_matrix
 
 def commuting_operators(basis, operator, operation_mode='commutator', return_superoperator=False, num_vecs=None, tol=1e-10):
     """Find operators in the vector space spanned by the
-    OperatorStrings :math:`\hat{h}_a` that commute (or 
+    OperatorStrings :math:`\\hat{h}_a` that commute (or 
     anti-commute) with the given Operator 
-    :math:`\hat{\mathcal{O}} = \sum_{a} g_a \hat{h}_a`.
+    :math:`\\hat{\\mathcal{O}} = \\sum_{a} g_a \\hat{h}_a`.
 
     These operators are null vectors of the commutant matrix.
 
     Parameters
     ----------
     basis : Basis or list of Operators
-        The Basis of OperatorStrings :math:`\hat{h}_a` or list 
-        of Operators :math:`\hat{\mathcal{O}}_a` to search in.
+        The Basis of OperatorStrings :math:`\\hat{h}_a` or list 
+        of Operators :math:`\\hat{\\mathcal{O}}_a` to search in.
     operator : Operator
-        The Operator :math:`\hat{\mathcal{O}}` to commute (or 
+        The Operator :math:`\\hat{\\mathcal{O}}` to commute (or 
         anti-commute) with.
     operation_mode : str, optional
         Specifies whether to search for operators that
@@ -52,7 +52,7 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_sup
         with `operator` ('anticommutator'). Defaults to 
         'commutator'.
     return_superoperator : bool, optional
-        If True, return :math:`C^\dagger C` where :math:`C`
+        If True, return :math:`C^\\dagger C` where :math:`C`
         is the commutant matrix, along with eigenvalues and
         eigenvectors. Default is False.
     num_vecs : int, optional
@@ -70,12 +70,12 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_sup
     ndarray or (scipy sparse matrix, scipy sparse matrix, scipy sparse matrix, scipy sparse matrix)
         If `return_com_matrix` is False, returns a numpy array
         whose columns are operators in the given Basis. In particular,
-        the column vectors :math:`J^{(1)},\ldots,J^{(M)}` are the 
+        the column vectors :math:`J^{(1)},\\ldots,J^{(M)}` are the 
         coefficients :math:`J_a^{(i)}` of operators 
-        :math:`\hat{H}^{(i)}=\sum_{a} J_a^{(i)} \hat{h}_a` that commute 
-        (or anti-commute) with the given Operator :math:`\hat{\mathcal{O}}`.
+        :math:`\\hat{H}^{(i)}=\\sum_{a} J_a^{(i)} \\hat{h}_a` that commute 
+        (or anti-commute) with the given Operator :math:`\\hat{\\mathcal{O}}`.
         If `return_superoperator` is True, returns a tuple of the null
-        vectors, the matrix :math:`C^\dagger C`, its eigenvalues, and its eigenvectors
+        vectors, the matrix :math:`C^\\dagger C`, its eigenvalues, and its eigenvectors
         as sparse scipy matrices where :math:`C` is the commutant matrix.
     """
     
@@ -103,19 +103,19 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_sup
 
 def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=None, return_superoperator=False, tol=1e-10):
     """Find operators in the vector space spanned by the
-    OperatorStrings :math:`\hat{h}_a` that commute (or anti-commute)
-    with the Transformation :math:`\hat{\mathcal{U}}`.
+    OperatorStrings :math:`\\hat{h}_a` that commute (or anti-commute)
+    with the Transformation :math:`\\hat{\\mathcal{U}}`.
 
-    These operators are :math:`(\pm 1)`-eigenvalue eigenvectors 
+    These operators are :math:`(\\pm 1)`-eigenvalue eigenvectors 
     of the symmetry matrix.
 
     Parameters
     ----------
     basis : Basis or list of Operators
-        The Basis of OperatorStrings :math:`\hat{h}_a` or list 
-        of Operators :math:`\hat{\mathcal{O}}_a` to search in.
+        The Basis of OperatorStrings :math:`\\hat{h}_a` or list 
+        of Operators :math:`\\hat{\\mathcal{O}}_a` to search in.
     transform : Transformation
-        The Transformation :math:`\hat{\mathcal{U}}` to commute (or 
+        The Transformation :math:`\\hat{\\mathcal{U}}` to commute (or 
         anti-commute) with.
     operation_mode : str, optional
         Specifies whether to search for operators that
@@ -123,29 +123,29 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
         with `transform` ('anticommutator'). Defaults to 
         'commutator'.
     return_superoperator : bool, optional
-        If True, returns :math:`I \mp (S + S^\dagger)/2` where
+        If True, returns :math:`I \\mp (S + S^\\dagger)/2` where
         :math:`S` is the symmetry matrix. The null space of 
-        this superoperator corresponds to the :math:`(\pm 1)` 
+        this superoperator corresponds to the :math:`(\\pm 1)` 
         eigenspace of the symmetry matrix. Default is False.
     num_vecs : int, optional
         Default to None. If None, then the symmetry matrix
         is converted to a dense matrix and full diagonalization
         is performed. Otherwise, keeps the matrix sparse
         and computes the `num_vecs` eigenvectors closest
-        to :math:`(\pm 1)` during diagonalization.
+        to :math:`(\\pm 1)` during diagonalization.
     tol : float, optional
         The numerical cutoff used to determine what eigenvectors
-        are in the :math:`(\pm 1)` eigenspace of the symmetry matrix.
+        are in the :math:`(\\pm 1)` eigenspace of the symmetry matrix.
 
     Returns
     -------
     ndarray or (sparse matrix, sparse matrix, sparse matrix, sparse matrix)
         If `return_sym_matrix` is False, returns a numpy array
         whose columns are operators in the given Basis. In particular,
-        the column vectors :math:`J^{(1)},\ldots,J^{(M)}` are the 
+        the column vectors :math:`J^{(1)},\\ldots,J^{(M)}` are the 
         coefficients :math:`J_a^{(i)}` of operators 
-        :math:`\hat{H}^{(i)}=\sum_{a} J_a^{(i)} \hat{h}_a` that commute 
-        (or anti-commute) with the given Transformation :math:`\hat{\mathcal{U}}`.
+        :math:`\\hat{H}^{(i)}=\\sum_{a} J_a^{(i)} \\hat{h}_a` that commute 
+        (or anti-commute) with the given Transformation :math:`\\hat{\\mathcal{U}}`.
         If `return_superoperator` is True, returns a tuple of the null
         vectors, a modified symmetry matrix, its eigenvalues, and its eigenvectors
         as sparse scipy matrices.
@@ -547,14 +547,14 @@ class SymmetricOperatorGenerator:
             Defaults to True.
         tol : float, optional
             Specifies the threshold used to consider whether an eigenvalue is
-            close to :math:`0,\pm 1`. Defaults to 1e-10.
+            close to :math:`0,\\pm 1`. Defaults to 1e-10.
 
         Notes
         -----
         The noncumulative mode calculation occurs in up to four steps:
           1. *Generation:* In order, calculate the commutant matrix of 
-             Operator :math:`\hat{\mathcal{O}}` or the symmetry matrix 
-             of Transformation :math:`\hat{\mathcal{U}}` and diagonalize it.
+             Operator :math:`\\hat{\\mathcal{O}}` or the symmetry matrix 
+             of Transformation :math:`\\hat{\\mathcal{U}}` and diagonalize it.
           2. *Projection:* In order, project the results for the previous 
              symmetries onto the current symmetry.
           3. *Sparsification:* (optional) In order, sparsify the vectors obtained from steps 1-2.
