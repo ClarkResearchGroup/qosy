@@ -5,7 +5,9 @@ a lattice and interactions on a lattice. Also,
 printing tools are provided.
 """
 
+import warnings
 import numpy as np
+import numpy.linalg as nla
 import scipy.spatial as ssp
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -89,7 +91,7 @@ def relabel_orbitals(string, lattice):
     
     return result
         
-def print_vectors(basis, vectors, lattice=None, convert_to=None, norm_order=None):
+def print_vectors(basis, vectors, lattice=None, keywords=None, convert_to=None, norm_order=None, tol=1e-10):
     """Print in human-readable form the vectors
     as Operators in the given Basis.
     
@@ -103,6 +105,10 @@ def print_vectors(basis, vectors, lattice=None, convert_to=None, norm_order=None
     lattice : Lattice, optional
         If provided, convert orbital labels to 
         lattice coordinate labels. Defaults to None.
+    keywords : list of str, optional
+        If provided (along with lattice), only prints
+        OperatorStrings whose string representation
+        include the given keywords. Defaults to None.
     convert_to : str, optional
         If not None, convert OperatorStrings to the given type
         before printing. Defaults to None.
@@ -111,6 +117,9 @@ def print_vectors(basis, vectors, lattice=None, convert_to=None, norm_order=None
         (see `numpy.norm`). Defaults to None, which is the 
         :math:`\\ell_2`-norm. Another useful norm is the `inf` 
         order norm.
+    tol : float, optional
+        The tolerance within which to consider zero (and
+        not print them). Defaults to 1e-10.
     """
     
     if len(basis) != int(vectors.shape[0]):
@@ -125,19 +134,31 @@ def print_vectors(basis, vectors, lattice=None, convert_to=None, norm_order=None
     
     ind_vec = 1
     for operator in operators:
-        cleaned_operator = operator.remove_zeros()
+        cleaned_operator = operator.remove_zeros(tol=tol)
         cleaned_operator.normalize(order=norm_order)
         print('vector {} = '.format(ind_vec))
 
         output_string = str(cleaned_operator)
         if lattice is not None:
             output_string = relabel_orbitals(output_string, lattice)
-        
+
+            # Filter out all the OperatorStrings
+            # that contain the given keywords.
+            if keywords is not None:
+                new_output_string = ''
+                for line in output_string.split('\n'):
+                    for keyword in keywords:
+                        if keyword in line:
+                            new_output_string += line+'\n'
+                            break
+
+                output_string = new_output_string
+            
         print(output_string)
         
         ind_vec += 1
 
-def print_operators(operators, lattice=None, convert_to=None, norm_order=None):
+def print_operators(operators, lattice=None, keywords=None, convert_to=None, norm_order=None, tol=1e-10):
     """Print in human-readable form a list of Operators.
     
     Parameters
@@ -147,6 +168,10 @@ def print_operators(operators, lattice=None, convert_to=None, norm_order=None):
     lattice : Lattice, optional
         If provided, convert orbital labels to 
         lattice coordinate labels. Defaults to None.
+    keywords : list of str, optional
+        If provided (along with lattice), only prints
+        OperatorStrings whose string representation
+        include the given keywords. Defaults to None.
     convert_to : str, optional
         If not None, convert OperatorStrings to the given type
         before printing. Defaults to None.
@@ -155,6 +180,9 @@ def print_operators(operators, lattice=None, convert_to=None, norm_order=None):
         (see `numpy.norm`). Defaults to None, which is the 
         :math:`\\ell_2`-norm. Another useful norm is the `inf` 
         order norm.
+    tol : float, optional
+        The tolerance within which to consider zero (and
+        not print them). Defaults to 1e-10.
     """
     
     if convert_to is not None:
@@ -164,7 +192,7 @@ def print_operators(operators, lattice=None, convert_to=None, norm_order=None):
     
     ind_vec = 1
     for operator in operators_to_print:
-        cleaned_operator = operator.remove_zeros()
+        cleaned_operator = operator.remove_zeros(tol=tol)
         cleaned_operator.normalize(order=norm_order)
 
         print('operator {} = '.format(ind_vec))
@@ -172,7 +200,19 @@ def print_operators(operators, lattice=None, convert_to=None, norm_order=None):
         output_string = str(cleaned_operator)
         if lattice is not None:
             output_string = relabel_orbitals(output_string, lattice)
-        
+
+            # Filter out all the OperatorStrings
+            # that contain the given keywords.
+            if keywords is not None:
+                new_output_string = ''
+                for line in output_string.split('\n'):
+                    for keyword in keywords:
+                        if keyword in line:
+                            new_output_string += line+'\n'
+                            break
+
+                output_string = new_output_string
+            
         print(output_string)
 
         ind_vec += 1
@@ -231,8 +271,8 @@ def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seit
 
         if with_lattice_vectors:
             for v in lattice.unit_cell.lattice_vectors:
-                plt.plot([0.0, v[0]], [0.0, v[1]], 'r.')
-                plt.arrow(0.0, 0.0, v[0], v[1], color='r', head_width=0.1, length_includes_head=True)
+                plt.plot([0.0, v[0]], [0.0, 0.0], 'r.')
+                plt.arrow(0.0, 0.0, v[0], 0.0, color='r', head_width=0.1, length_includes_head=True)
 
         xmin = np.min(xs + [v[0] for v in lattice.unit_cell.lattice_vectors])
         xmax = np.max(xs + [v[0] for v in lattice.unit_cell.lattice_vectors])
@@ -352,6 +392,144 @@ def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seit
                 ax.text(pos_atom[0], pos_atom[1], pos_atom[2], str(labels_atom), size=20, zorder=1)
     else:
         raise ValueError('Cannot plot a {}-dimensional lattice.'.format(lattice.dim))
+
+# TODO: document
+def plot_opstring(op_string, lattice, distance_cutoff=None, weight=1.0, marker_size=20):
+    
+    
+    if op_string.op_type == 'Pauli':
+        markercolors = {'X':'r', 'Y':'g', 'Z':'b'}
+    elif op_string.op_type == 'Majorana':
+        markercolors = {'A':'r', 'B':'g', 'D':'b'}
+    elif op_string.op_type == 'Fermion':
+        markercolors = {'CDag':'r', 'C':'b'}
+        
+    max_width = 3.0
+    
+    if np.imag(weight) > 1e-10:
+        warnings.warn('Cannot plot an operator string with an imaginary coefficient. Taking real part.')
+    
+    weight = np.real(weight)
+
+    # 1D or 2D plots
+    if lattice.dim == 1 or lattice.dim == 2:
+        if len(op_string.orbital_operators) == 1:
+            orb_op    = op_string.orbital_operators[0]
+            orb_label = op_string.orbital_labels[0]
+            (pos, orb_name, cell_coord) = lattice._orbitals[orb_label]
+
+            if lattice.dim == 1:
+                pos = np.array([pos[0], 0.0])
+        
+            plt.plot([pos[0]], [pos[1]], color=markercolors[orb_op], markeredgecolor=markercolors[orb_op], alpha=0.5*np.abs(weight), markersize=marker_size)
+
+            if orb_name != '':
+                plt.annotate(orb_name, xy=(pos[0],pos[1]), color='k')
+
+        elif len(op_string.orbital_operators) == 2:
+            orb_op1    = op_string.orbital_operators[0]
+            orb_label1 = op_string.orbital_labels[0]
+            (pos1, orb_name1, cell_coord1) = lattice._orbitals[orb_label1]
+
+            orb_op2    = op_string.orbital_operators[1]
+            orb_label2 = op_string.orbital_labels[1]
+            (pos2, orb_name2, cell_coord2) = lattice._orbitals[orb_label2]
+
+            if lattice.dim == 1:
+                pos1 = np.array([pos1[0], 0.0])
+                pos2 = np.array([pos2[0], 0.0])
+
+            # TODO: finish
+            if distance_cutoff is not None:
+                if nla.norm(pos1-pos2) > distance_cutoff:
+                    return
+
+            # TODO: flag to plot only bonds involving a particular site
+
+            plt.plot([pos1[0]], [pos1[1]], color=markercolors[orb_op1], markeredgecolor=markercolors[orb_op1], alpha=0.5*np.abs(weight), markersize=marker_size)
+            if orb_name1 != '':
+                plt.annotate(orb_name1, xy=(pos1[0],pos1[1]), color='k')
+            
+            plt.plot([pos2[0]], [pos2[1]], color=markercolors[orb_op1], markeredgecolor=markercolors[orb_op2], alpha=0.5*np.abs(weight), markersize=marker_size)
+            if orb_name2 != '':
+                plt.annotate(orb_name2, xy=(pos2[0],pos2[1]), color='k')
+
+            if weight > 0.0:
+                plt.plot([pos1[0], pos2[0]], [pos1[1], pos2[1]], 'b-', linewidth=max_width*np.abs(weight), alpha=0.5*np.abs(weight))
+            else:
+                plt.plot([pos1[0], pos2[0]], [pos1[1], pos2[1]], 'r-', linewidth=max_width*np.abs(weight), alpha=0.5*np.abs(weight))
+        else:
+            raise NotImplementedError('No supported visualization for operators on more than two sites yet.')
+    # 3D plot
+    elif lattice.dim == 3:
+        fig = plt.gcf()
+        ax  = plt.gca()
+        if ax.name != '3d':
+            ax = fig.add_subplot(111, projection='3d')
+        
+        if len(op_string.orbital_operators) == 1:
+            orb_op    = op_string.orbital_operators[0]
+            orb_label = op_string.orbital_labels[0]
+            (pos, orb_name, cell_coord) = lattice._orbitals[orb_label]
+        
+            ax.scatter([pos[0]], [pos[1]], zs=[pos[2]], c=markercolors[orb_op], alpha=0.5*np.abs(weight), s=marker_size)
+
+            if orb_name != '':
+                ax.text(pos[0], pos[1], pos[2], orb_name, size=20, zorder=1)
+
+        elif len(op_string.orbital_operators) == 2:
+            orb_op1    = op_string.orbital_operators[0]
+            orb_label1 = op_string.orbital_labels[0]
+            (pos1, orb_name1, cell_coord1) = lattice._orbitals[orb_label1]
+
+            orb_op2    = op_string.orbital_operators[1]
+            orb_label2 = op_string.orbital_labels[1]
+            (pos2, orb_name2, cell_coord2) = lattice._orbitals[orb_label2]
+
+            if distance_cutoff is not None:
+                if nla.norm(pos1-pos2) > distance_cutoff:
+                    return
+            
+            ax.scatter([pos1[0]], [pos1[1]], zs=[pos1[2]], marker='o', c=markercolors[orb_op1], alpha=0.5*np.abs(weight), s=marker_size)
+            if orb_name1 != '':
+                ax.text(pos1[0], pos1[1], pos1[2], orb_name1, size=20, zorder=1)
+
+            ax.scatter([pos2[0]], [pos2[1]], zs=[pos2[2]], marker='o', c=markercolors[orb_op1], alpha=0.5*np.abs(weight), s=marker_size)
+            if orb_name2 != '':
+                ax.text(pos2[0], pos2[1], pos2[2], orb_name2, size=20, zorder=1)
+
+            if weight > 0.0:
+                ax.plot([pos1[0], pos2[0]], [pos1[1], pos2[1]], zs=[pos1[2], pos2[2]], color='b', linewidth=max_width*np.abs(weight), alpha=0.5*np.abs(weight))
+            else:
+                ax.plot([pos1[0], pos2[0]], [pos1[1], pos2[1]], zs=[pos1[2], pos2[2]], color='r', linewidth=max_width*np.abs(weight), alpha=0.5*np.abs(weight))
+        else:
+            raise NotImplementedError('Not finished yet.')  
+    else:
+        raise ValueError('Cannot plot lattice of dimension {}'.format(lattice.dim))
+            
+def plot_operator(operator, lattice, distance_cutoff=None, marker_size=20):
+    """Plot a visual representation of the
+    Operator on a Lattice.
+
+    Parameters
+    ----------
+    operator : Operator
+        The Operator to plot.
+    lattice : Lattice
+        The lattice to plot the Operator on.
+  
+    Examples
+    --------
+    To visualized the operator with the lattice in the background:
+       >>> qosy.plot(lattice)
+       >>> qosy.plot(operator, lattice)
+       >>> qosy.show()
+    """
+
+    max_coeff = np.max(np.abs(operator.coeffs))
+    
+    for (coeff, op_string) in operator:
+        plot_opstring(op_string, lattice, distance_cutoff=distance_cutoff, weight=(coeff/max_coeff), marker_size=marker_size)
     
 def show():
     """Display a figure.

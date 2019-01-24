@@ -4,6 +4,31 @@ import numpy as np
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
 
+def test_sign():
+    perm = np.array([0,1,2,3],dtype=int)
+    expected_sign = 1
+    sign = qy.tools.sign(perm)
+
+    assert(sign == expected_sign)
+
+    perm = np.array([1,0,2,3],dtype=int)
+    expected_sign = -1
+    sign = qy.tools.sign(perm)
+
+    assert(sign == expected_sign)
+
+    perm = np.array([1,0,3,2],dtype=int)
+    expected_sign = 1
+    sign = qy.tools.sign(perm)
+
+    assert(sign == expected_sign)
+
+    perm = np.array([2,4,1,3,0,5],dtype=int)
+    expected_sign = -1
+    sign = qy.tools.sign(perm)
+
+    assert(sign == expected_sign)
+    
 def test_sort_sign():
     arr                 = np.array([-1,3,1])
     expected_sorted_arr = np.sort(arr)
@@ -37,6 +62,7 @@ def test_swap():
 
 def test_replace():
     assert(qy.tools.replace('ABC', {'A':'AB', 'B':'D', 'C':'AC'}) == 'ABDAC')
+    assert(qy.tools.replace(' 0 100 10 1 110', {' 0':'_{0}', ' 1' : '_{1}', ' 10' : '_{10}', ' 100' : '_{100}', ' 110' : '_{110}'}) == '_{0}_{100}_{10}_{1}_{110}')
     
 def test_maximal_cliques():
     # Toy graph on https://en.wikipedia.org/wiki/Bron%E2%80%93Kerbosch_algorithm
@@ -69,6 +95,15 @@ def test_gram_schmidt():
                                              [1., -1.]])
 
     assert(np.allclose(vecs, expected_vecs))
+
+    matrix = np.array([[1., 1.,  2.],\
+                       [1., 0., -2.]])
+
+    vecs = qy.tools.gram_schmidt(ss.csc_matrix(matrix), tol=1e-12)
+    expected_vecs = 1./np.sqrt(2.)*np.array([[1.,  1.],\
+                                             [1., -1.]])
+
+    assert(np.allclose(vecs.toarray(), expected_vecs))
     
     n = 10
     m = 5

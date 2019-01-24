@@ -429,7 +429,7 @@ class SymmetricOperatorGenerator:
                     dim_prev = int(prev_ops.shape[1])
                     print(' ({}) Orthogonalized a vector space of dim {} against one with dim {}'.format(ind_output, dim_prev, dim_curr))
 
-    def _generate_cumulative(self, sparsification=True, verbose=True, tol=1e-10):
+    def _generate_cumulative(self, sparsification=True, orthogonalization=True, verbose=True, tol=1e-10):
         num_inputs = len(self.input_symmetries)
 
         if verbose:
@@ -480,7 +480,12 @@ class SymmetricOperatorGenerator:
             # Sparsify the vectors representing the
             # operators in the null space.
             if sparsification:
-                output_ops = sparsify(output_ops)
+                # Always sparsify and orthogonalize first.
+                output_ops = sparsify(output_ops, orthogonalize=True)
+
+                # Then sparsify without orthogonalizing if necessary.
+                if not orthogonalization:
+                    output_ops = sparsify(output_ops, orthogonalize=False)
 
             # Convert the vectors into a list of Operators.
             projected_output_ops = []
@@ -563,7 +568,7 @@ class SymmetricOperatorGenerator:
         """
         
         if mode == 'cumulative':
-            return self._generate_cumulative(sparsification=sparsification, verbose=verbose, tol=tol)
+            return self._generate_cumulative(sparsification=sparsification, orthogonalization=orthogonalization, verbose=verbose, tol=tol)
         elif mode == 'noncumulative':
             return self._generate_noncumulative(sparsification=sparsification, orthogonalization=orthogonalization, verbose=verbose, tol=tol)
         else:

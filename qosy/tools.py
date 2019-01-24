@@ -7,20 +7,65 @@ throughout ``qosy``.
 import re
 import numpy as np
 import numpy.linalg as nla
+import scipy.sparse as ss
 import scipy.linalg as sla
 
-def sort_sign(vector, tol=1e-10):
+def sign(permutation):
+    """Compute the sign of a permutation.
+
+    Parameters
+    ----------
+    permutation : ndarray of int
+        The permutation whose sign to compute.
+
+    Returns
+    -------
+    int
+        +1 or -1, depending on whether the
+        permutation is even or odd.
+
+    Examples
+    --------
+        >>> sign(np.array([1,0,2],dtype=int)) # -1
+    """
+
+    # Identify the cycles and count their lengths.
+    # Even (odd) length cycles are made of an odd (even)
+    # number of transpositions, so contribute a -1 (+1).
+    visited = set()
+    cycle_length = 0
+    sign = 1
+    
+    for ind in range(len(permutation)):
+        if ind not in visited:
+            visited.add(ind)
+            cycle_length = 1
+            ind_cycle = permutation[ind]
+            while ind_cycle not in visited:
+                cycle_length += 1
+                visited.add(ind_cycle)
+                ind_cycle = permutation[ind_cycle]
+
+            if cycle_length % 2 == 0:
+                sign *= -1
+                
+    return sign
+
+def sort_sign(vector, tol=1e-10, method='insertionsort'):
     """Stable sort the vector and return
     the sign of the permutation needed to sort it.
 
     Parameters
     ----------
-    vector : ndarray of numbers
+    vector : list or ndarray of numbers
         The vector to sort.
+    method : str, optional
+        The sorting method used, 'insertionsort'
+        or 'mergesort'. Defaults to 'insertionsort'.
     
     Returns
     -------
-    (array_like, int)
+    (ndarray, int)
         A tuple of (a new copy of) the sorted vector
         and the sign of the permutation needed to sort it.
 
@@ -31,24 +76,36 @@ def sort_sign(vector, tol=1e-10):
        >>> sorted_arr # numpy.array([-0.3, 1, 141])
        >>> sign       # -1
     """
-    
-    vec   = np.copy(vector)
-    
-    n     = len(vec)
-    swaps = 0
 
-    for i in range(1,n):
-        j = i
-        while j > 0 and np.abs(vec[j-1] - vec[j]) > tol and vec[j-1] > vec[j]:
-            # Swap if the elements are not identical.
-            vec[j], vec[j-1] = vec[j-1], vec[j]
-            swaps += 1
-            j -= 1
+    if method == 'mergesort':
+        # Using numpy's mergesort.
+        vec = np.array(vector)
+
+        permutation = np.argsort(vec, kind='mergesort')
+        sign_perm   = sign(permutation)
+
+        return (vec[permutation], sign_perm)
+    elif method == 'insertionsort':
+        # Using insertion sort.
+        vec   = np.copy(vector)
+        
+        n     = len(vec)
+        swaps = 0
+
+        for i in range(1,n):
+            j = i
+            while j > 0 and np.abs(vec[j-1] - vec[j]) > tol and vec[j-1] > vec[j]:
+                # Swap if the elements are not identical.
+                vec[j], vec[j-1] = vec[j-1], vec[j]
+                swaps += 1
+                j -= 1
                 
-    if swaps % 2 == 1:
-        return (vec, -1)
+        if swaps % 2 == 1:
+            return (vec, -1)
+        else:
+            return (vec, 1)
     else:
-        return (vec, 1)
+        raise ValueError('Invalid method: {}'.format(method))
 
 def compare(labelsI, labelsJ):
     """Lexicographically compare two sets of labels, :math:`(i_1,\\ldots,i_m)` 
@@ -288,12 +345,33 @@ def replace(string, substitutions):
 
     return regex.sub(lambda match: substitutions[match.group(0)], string)
 
+def compose_permutations(permA, permB):
+    """Compose two permutations.
+
+    Parameters
+    ----------
+    permA : list or ndarray of int
+        First permutation.
+    permB : list or ndarray of int
+        Second permutation.
+
+    Returns
+    -------
+    ndarray of int
+        Composition of the two permutations.
+    """
+
+    pA = np.array(permA, dtype=int)
+    pB = np.array(permB, dtype=int)
+    
+    return pA[pB]
+
 def gram_schmidt(matrix, tol=0.0):
     """Perform Gram-Schmidt decomposition.
 
     Parameters
     ----------
-    matrix : ndarray or scipy.sparse matrix
+    matrix : ndarray or scipy.sparse.csc_matrix
         A matrix whose columns we want to orthogonalize
         going from left to right.
     tol : float, optional
@@ -303,38 +381,58 @@ def gram_schmidt(matrix, tol=0.0):
 
     Returns
     -------
-    ndarray
+    ndarray or scipy.sparse.csc_matrix
         A unitary matrix whose columns are orthonormal vectors that
         form an orthonormal basis of the column space of the given matrix.
         The number of columns of the returned matrix can be smaller than
         the given matrix if the given matrix is noninvertible.
     """
     
-    new_matrix = np.copy(matrix)
     n = int(matrix.shape[0])
     k = int(matrix.shape[1])
 
     if n==0 or k==0:
-        return new_matrix
+        return matrix.copy()
 
+    # Use different functions for
+    # dot products and norms for numpy
+    # arrays and scipy sparse matrices.
+    if isinstance(matrix, np.ndarray):
+        new_matrix = np.zeros(dtype=complex,shape=matrix.shape)
+        
+        def _norm(vec):
+            return nla.norm(vec)
+        def _vdot(vec1, vec2):
+            return np.vdot(vec1, vec2)
+    else:
+        new_matrix = ss.lil_matrix(matrix.shape, dtype=complex)
+        
+        def _norm(vec):
+            return np.sqrt(np.abs((vec.H).dot(vec)[0,0]))
+        def _vdot(vec1, vec2):
+            return (vec1.H).dot(vec2)[0,0]
+        
     shift = 0
-    new_matrix[:,0] = matrix[:,0] / nla.norm(matrix[:,0])
+    new_matrix[:,0] = matrix[:,0] / _norm(matrix[:,0])
     
-    for indColUnshifted in range(1,k):
-        indCol = indColUnshifted - shift
-        new_matrix[:,indCol] = matrix[:,indColUnshifted]
-        for indVec in range(indCol):
-            new_matrix[:,indCol] = new_matrix[:,indCol] - np.vdot(new_matrix[:,indCol], new_matrix[:,indVec]) * new_matrix[:,indVec]
+    for ind_col_unshifted in range(1,k):
+        ind_col = ind_col_unshifted - shift
+        new_matrix[:,ind_col] = matrix[:,ind_col_unshifted]
+        for ind_vec in range(ind_col):
+            new_matrix[:,ind_col] -= _vdot(new_matrix[:,ind_col], new_matrix[:,ind_vec]) * new_matrix[:,ind_vec]
 
-        norm = nla.norm(new_matrix[:,indCol])
+        norm = _norm(new_matrix[:,ind_col])
         
         if norm > tol:
-            new_matrix[:,indCol] = new_matrix[:,indCol] / norm
+            new_matrix[:,ind_col] = new_matrix[:,ind_col] / norm
         else:
             # Found a column that is linearly dependent on the previously found ones.
             shift += 1
-        
-    return new_matrix[:,0:(k-shift)]
+
+    if isinstance(matrix, np.ndarray):
+        return new_matrix[:,0:(k-shift)]
+    else:
+        return new_matrix[:,0:(k-shift)].tocsc()
 
 def intersection(A, B, tol=1e-10):
     """Find the intersection of two vector spaces. 
@@ -427,5 +525,10 @@ def sparsify(vectors, orthogonalize=True, tol=1e-12):
     # Normalize the vectors.
     for ind_vec in range(num_vectors):
         vectors_rre[:, ind_vec] /= nla.norm(vectors_rre[:, ind_vec])
-    
+
+    # Reorder the vectors by sparsity.
+    sparsity = [np.sum(np.abs(vectors_rre[:, ind_vec]) > tol) for ind_vec in range(num_vectors)]
+    inds_sort = np.argsort(sparsity)
+    vectors_rre = vectors_rre[:, inds_sort]
+        
     return vectors_rre

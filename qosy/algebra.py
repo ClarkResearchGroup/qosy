@@ -10,7 +10,7 @@ on a Basis of OperatorStrings.
 import numpy as np
 import scipy.sparse as ss
 
-from .tools import sort_sign
+from .tools import sort_sign, gram_schmidt
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
 
@@ -117,6 +117,12 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
         else:
             coeff = 0.0
         
+    # To avoid the overhead of creating a new
+    # OperatorString object, return None when
+    # the result is a zero operator.
+    if np.abs(coeff) < tol:
+        return (0.0, None)
+            
     op_string_C = OperatorString(opsC, labelsC, op_type)
     
     coeff /= op_string_C.prefactor
@@ -130,6 +136,9 @@ def _operation_operator(operatorA, operatorB, operation_mode='commutator', tol=1
     """Perform an algebraic binary operation between
     two Operators.
     """
+
+    if operatorA.op_type != operatorB.op_type:
+        raise ValueError('Cannot perform algebraic operation {} between Operators of types {} and {}.'.format(operation_mode, operatorA.op_type, operatorB.op_type))
     
     coeffs_of_opstrings = dict()
     for (coeffA, op_string_A) in operatorA:
@@ -152,7 +161,7 @@ def _operation_operator(operatorA, operatorB, operation_mode='commutator', tol=1
         coeffs.append(coeff)
         op_strings.append(op_string)
 
-    return Operator(coeffs, op_strings)
+    return Operator(coeffs, op_strings, op_type=operatorA.op_type)
     
 def product(op_A, op_B):
     """Compute the product of two OperatorStrings or Operators.
@@ -160,15 +169,15 @@ def product(op_A, op_B):
     Parameters
     ----------
     op_A : OperatorString or Operator
-        OperatorString :math:`\hat{h}_a` or Operator :math:`\hat{\mathcal{O}}_A`.
+        OperatorString :math:`\\hat{h}_a` or Operator :math:`\\hat{\\mathcal{O}}_A`.
     op_B : OperatorString or Operator
-        OperatorString :math:`\hat{h}_b` or Operator :math:`\hat{\mathcal{O}}_B`.
+        OperatorString :math:`\\hat{h}_b` or Operator :math:`\\hat{\\mathcal{O}}_B`.
 
     Returns
     -------
     (float, OperatorString) or Operator
-        Operator that represents the product :math:`\hat{h}_a \hat{h}_b` 
-        or :math:`\hat{\mathcal{O}}_A \hat{\mathcal{O}}_B`.
+        Operator that represents the product :math:`\\hat{h}_a \\hat{h}_b` 
+        or :math:`\\hat{\\mathcal{O}}_A \\hat{\\mathcal{O}}_B`.
 
     Examples
     --------
@@ -190,15 +199,15 @@ def commutator(op_A, op_B):
     Parameters
     ----------
     op_A : OperatorString or Operator
-        OperatorString :math:`\hat{h}_a` or Operator :math:`\hat{\mathcal{O}}_A`.
+        OperatorString :math:`\\hat{h}_a` or Operator :math:`\\hat{\\mathcal{O}}_A`.
     op_B : OperatorString or Operator
-        OperatorString :math:`\hat{h}_b` or Operator :math:`\hat{\mathcal{O}}_B`.
+        OperatorString :math:`\\hat{h}_b` or Operator :math:`\\hat{\\mathcal{O}}_B`.
 
     Returns
     -------
     (float, OperatorString) or Operator
-        Operator that represents the commutator :math:`[\hat{h}_a, \hat{h}_b]` 
-        or :math:`[\hat{\mathcal{O}}_A, \hat{\mathcal{O}}_B]`.
+        Operator that represents the commutator :math:`[\\hat{h}_a, \\hat{h}_b]` 
+        or :math:`[\\hat{\\mathcal{O}}_A, \\hat{\\mathcal{O}}_B]`.
 
     Examples
     --------
@@ -220,15 +229,15 @@ def anticommutator(op_A, op_B):
     Parameters
     ----------
     op_A : OperatorString or Operator
-        OperatorString :math:`\hat{h}_a` or Operator :math:`\hat{\mathcal{O}}_A`.
+        OperatorString :math:`\\hat{h}_a` or Operator :math:`\\hat{\\mathcal{O}}_A`.
     op_B : OperatorString or Operator
-        OperatorString :math:`\hat{h}_b` or Operator :math:`\hat{\mathcal{O}}_B`.
+        OperatorString :math:`\\hat{h}_b` or Operator :math:`\\hat{\\mathcal{O}}_B`.
 
     Returns
     -------
     (float, OperatorString) or Operator
-        Operator that represents the anticommutator :math:`\{\hat{h}_a, \hat{h}_b\}` 
-        or :math:`\{\hat{\mathcal{O}}_A, \hat{\mathcal{O}}_B\}`.
+        Operator that represents the anticommutator :math:`\\{\\hat{h}_a, \\hat{h}_b\\}` 
+        or :math:`\\{\\hat{\\mathcal{O}}_A, \\hat{\\mathcal{O}}_B\\}`.
 
     Examples
     --------
@@ -250,16 +259,16 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
     bases.
 
     The structure constants :math:`N_{ab}^c` are defined by
-        :math:`[\hat{h}_a, \hat{h}_b] = \sum_{c} N_{ab}^c \hat{h}_c`
+        :math:`[\\hat{h}_a, \\hat{h}_b] = \\sum_{c} N_{ab}^c \\hat{h}_c`
 
     Parameters
     ----------
     basisA : Basis
         The basis of OperatorStrings containing 
-        :math:`\hat{h}_a`.
+        :math:`\\hat{h}_a`.
     basisB : Basis
         The basis of OperatorStrings containing 
-        :math:`\hat{h}_b`.
+        :math:`\\hat{h}_b`.
     operation_mode : str, optional
         Specifies what binary algebraic operation to use to
         define the structure constants. By default, uses
@@ -267,9 +276,9 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
         or 'product'.
     return_extended_basis : bool, optional
         Specifies whether to return the "extended basis"
-        of OperatorStrings, which contains the :math:`\hat{h}_c`
+        of OperatorStrings, which contains the :math:`\\hat{h}_c`
         OperatorStrings generated by the binary operation
-        between :math:`\hat{h}_a` and :math:`\hat{h}_b`.
+        between :math:`\\hat{h}_a` and :math:`\\hat{h}_b`.
         Defaults to False.
 
     Returns
@@ -280,7 +289,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
         a list of scipy sparse matrices. The list is 
         organized as follows: the tensor :math:`N_{ab}^c` is
         split up into matrices :math:`A_{ca}^{(b)} =N_{ab}^c`.
-        The list stores the matrices [:math:`A^{(1)},A^{(2)},\ldots`].
+        The list stores the matrices [:math:`A^{(1)},A^{(2)},\\ldots`].
         For this reason, one should make sure that the
         dimension of `basisB` is less than or equal to `basisA`.
         If `return_extended_basis` is True, returns
@@ -385,23 +394,23 @@ def _commutant_matrix_operators(operators, operator, operation_mode):
 
 def commutant_matrix(basis, operator, operation_mode='commutator'):
     """Compute the commutant matrix that describes the effect
-    of commuting with the given Operator :math:`\hat{\mathcal{O}}` 
-    and express it in the given Basis of OperatorStrings :math:`\hat{h}_a`.
+    of commuting with the given Operator :math:`\\hat{\\mathcal{O}}` 
+    and express it in the given Basis of OperatorStrings :math:`\\hat{h}_a`.
     
-    The commutant matrix :math:`C_{\hat{\mathcal{O}}}` is defined
+    The commutant matrix :math:`C_{\\hat{\\mathcal{O}}}` is defined
     through the relation
-        :math:`[\hat{h}_a, \hat{\mathcal{O}}] \equiv \sum_c (C_{\hat{\mathcal{O}}})_{ca} \hat{h}_c`
-    where the OperatorStrings :math:`\hat{h}_c` make up an "extended
+        :math:`[\\hat{h}_a, \\hat{\\mathcal{O}}] \\equiv \\sum_c (C_{\\hat{\\mathcal{O}}})_{ca} \\hat{h}_c`
+    where the OperatorStrings :math:`\\hat{h}_c` make up an "extended
     basis" of OperatorStrings that is in general different from
-    the Basis spanned by :math:`\hat{h}_a`.
+    the Basis spanned by :math:`\\hat{h}_a`.
     
     Parameters
     ----------
     basis : Basis or list of Operators
-        The Basis of OperatorStrings :math:`\hat{h}_a` or list of
-        Operators :math:`\hat{\mathcal{O}}_a` to express the commutant matrix in.
+        The Basis of OperatorStrings :math:`\\hat{h}_a` or list of
+        Operators :math:`\\hat{\\mathcal{O}}_a` to express the commutant matrix in.
     operator : Operator
-        The operator :math:`\hat{\mathcal{O}}`.
+        The operator :math:`\\hat{\\mathcal{O}}`.
     
     Returns
     -------
@@ -430,7 +439,6 @@ def commutant_matrix(basis, operator, operation_mode='commutator'):
     else:
         raise ValueError('Invalid basis type: {}'.format(type(basis)))
     
-# TODO: finish
 def generate_lie_algebra(operators, tol=1e-12):
     """Construct the Lie algebra generated
     by the given basis of Hermitian operators.
@@ -452,21 +460,59 @@ def generate_lie_algebra(operators, tol=1e-12):
         the same format as ``operators``.
     """
     
-    raise NotImplementedError('Not finished yet.')
-    
     if isinstance(operators, Basis):
-        pass
-    elif isinstance(operators, list) and isinstance(operators[0], Operator):
-        num_operators = len(operators)
+        lie_algebra = Basis()
+        lie_algebra += operators
+
+        # Keep track of computations already performed
+        # to avoid unnecessary calculations.
+        inds_computed = set()
         
+        # Commute OperatorStrings in the current lie algebra
+        # against one another and collect any new OperatorStrings
+        # you obtain.
+        indA = 0
+        while indA < len(lie_algebra):
+            osA = lie_algebra[indA]
+            
+            indB = 0
+            while indB < len(lie_algebra):
+                if (indA,indB) in inds_computed or (indB,indA) in inds_computed:
+                    indB += 1
+                    continue
+                
+                osB = lie_algebra[indB]
+                
+                (coeffC, osC) = commutator(osA, osB)
+
+                # Ignore commuting operators.
+                if np.abs(coeffC) < tol:
+                    inds_computed.add((indA,indB))
+                    indB += 1
+                    continue
+
+                # If not already in the Basis,
+                # add the OperatorString to it.
+                if osC not in lie_algebra:
+                    lie_algebra += osC
+
+                inds_computed.add((indA,indB))
+                indB += 1
+                
+            indA += 1
+
+        return lie_algebra
+    elif isinstance(operators, list) and isinstance(operators[0], Operator):
+        lie_algebra = list(operators)
+
         combined_basis = Basis()
         for op in operators:
-            combined_basis += operators._basis
+            combined_basis += op._basis
 
         row_inds = []
         col_inds = []
         data     = []
-        for ind_op in range(num_operators):
+        for ind_op in range(len(operators)):
             for (coeff, op_string) in operators[ind_op]:
                 ind_os = combined_basis.index(op_string)
 
@@ -477,47 +523,114 @@ def generate_lie_algebra(operators, tol=1e-12):
 
         # Express the operators as vectors
         # in the combined_basis.
-        vectors = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(combined_basis), num_operators))
+        vectors = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(combined_basis), len(operators)))
 
-        # The projection onto the vector space
+        # For simplicity, orthogonalize the vectors.
+        # V = columns are the vectors
+        vectors = gram_schmidt(vectors)
+
+        # The projection P onto the vector space
         # spanned by vectors.
-        vecsHvecs_inv = ssla.inv((vectors.H).dot(vectors))
-        projector     = vectors.dot(vecsHvecs_inv.dot(vectors.H))
-        
-        new_operators = []
-        for indA in range(num_operators):
-            for indB in range(indA+1, num_operators):
-                opA = operators[indA]
-                opB = operators[indB]
-                
-                opC = commutator(opA, opB)
-                
-                # TODO: check whether opC is in the vector space
-                # spanned by vectors.
-                vecC    = ss.csc_matrix(opC.to_vector(combined_basis))
-                overlap = (vecC.H).dot(projector.dot(vecC))
 
-                # TODO: is it possible for opC to be a
-                # linear combination of operators in
-                # new_operators but not the original
-                # operators?
-                if np.abs(overlap - 1.0) < tol:
-                    new_operators.append(opC)
+        # If the vectors in V are not orthonormal,
+        # P = V (V^\dagger V)^{-1} V^\dagger
+        #vecsHvecs_inv = ssla.inv((vectors.H).dot(vectors))
+        #projector     = vectors.dot(vecsHvecs_inv.dot(vectors.H))
+        # If the vectors in V are orthonormal,
+        # P = V V^\dagger
+        projector = vectors.dot(vectors.H)
+
+        # Keep track of computations already performed
+        # to avoid unnecessary calculations.
+        inds_computed = set()
+
+        # Commute operators in the current lie algebra
+        # against one another and collect any new operators
+        # you obtain.
+        indA = 0
+        while indA < len(lie_algebra):
+            opA = lie_algebra[indA]
+            
+            indB = 0
+            while indB < len(lie_algebra):
+                if indA == indB or (indA,indB) in inds_computed or (indB,indA) in inds_computed:
+                    indB += 1
+                    continue
+                
+                opB = lie_algebra[indB]
+                
+                opC = -1j * commutator(opA, opB)
+
+                # Normalize the new operator.
+                if opC.norm() > tol:
+                    opC.remove_zeros(tol=tol)
+                    opC.normalize()
+                # Ignore commuting operators.
+                else:
+                    inds_computed.add((indA,indB))
+                    indB += 1
+                    continue
+
+                # First, check whether any OperatorStrings
+                # in opC are not in the current Basis.
+                num_new_op_strings = 0
+                for (coeff, os) in opC:
+                    if os not in combined_basis:
+                        num_new_op_strings += 1
+                        combined_basis += os
+
+                # Next, enlarge the vectors and the
+                # projector to the new Basis size.
+                if num_new_op_strings != 0:
+                    vectors = ss.vstack((vectors, ss.csc_matrix((num_new_op_strings, int(vectors.shape[1])), dtype=complex)), format='csc')
+                    #projector.resize((len(combined_basis), len(combined_basis)))
+                    projector = ss.block_diag((projector, ss.csc_matrix((num_new_op_strings,num_new_op_strings), dtype=complex)), format='csc')
+
+                # Check whether opC is in the vector space
+                # currently spanned by vectors.
+                vecC = opC.to_vector(combined_basis, fmt='csc')
+                
+                overlaps = projector.dot(vecC)
+                overlap  = (vecC.H).dot(overlaps)[0,0]
+
+                # If it is not already in the vector space,
+                # add it to the vector space and update the
+                # projector into that space.
+                if np.abs(overlap - 1.0) > tol:
+                    # Add the operator (in its original,
+                    # non orthogonal form) to the lie algebra.
+                    lie_algebra.append(opC)
+
+                    # Update the new vector so that is
+                    # orthogonal to the previous vectors
+                    # and normalized. Then add it to the vectors.
+                    vecC -= overlaps
+                    vecC /= np.sqrt(np.abs((vecC.H).dot(vecC)[0,0]))
+                    vectors = ss.hstack((vectors, vecC), format='csc')
+
+                    # Update the projector.
+                    projector += vecC.dot(vecC.H)
+                    
+                inds_computed.add((indA,indB))
+                indB += 1
+            indA += 1
+
+        return lie_algebra
     else:
         raise ValueError('Invalid operators type: {}'.format(type(operators)))
-
-# TODO: test
+    
+# TODO: finish and test
 def killing_form(operators):
     """Compute the Killing form 
-    :math:`K_{ab}=\sum_{cd} N_{ac}^d N_{bd}^c`
-    for the given operators :math:`\hat{h}_a` 
+    :math:`K_{ab}=\\sum_{cd} N_{ac}^d N_{bd}^c`
+    for the given operators :math:`\\hat{h}_a` 
     with structure constants :math:`N_{ab}^c`.
 
     Parameters
     ----------
     operators : Basis or list of Operators
         The Basis of OperatorStrings or list 
-        of Operators :math:`\hat{h}_a`.
+        of Operators :math:`\\hat{h}_a`.
 
     Returns
     -------
@@ -555,10 +668,10 @@ def killing_form(operators):
         # M_{a,(bc)}
         matrix1 = ss.csc_matrix((data, (row_inds, col_inds_bc)), dtype=complex, shape=(dim_a, dim_b*dim_c))
         # M_{(cb),a}
-        matrix1 = ss.csc_matrix((data, (col_inds_cb, row_inds)), dtype=complex, shape=(dim_b*dim_c, dim_a))
+        matrix2 = ss.csc_matrix((data, (col_inds_cb, row_inds)), dtype=complex, shape=(dim_b*dim_c, dim_a))
 
         # K_{ab} = \sum_{cd} M_{a(cd)} M_{b(dc)}
-        killing = matrix_bc.dot(matrix_cb)
+        killing = matrix1.dot(matrix2)
         
         return killing
     elif isinstance(operators, list) and isinstance(operators[0], Operator):

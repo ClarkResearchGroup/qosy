@@ -44,7 +44,7 @@ def test_commutator_pauli():
     assert(np.isclose(coeff_com12, expected_coeff_com12) and os_com12 == expected_os_com12)
     
     # Check that random Pauli strings commute with themselves.
-    expected_os_prod34    = qy.OperatorString([], [], 'Pauli')
+    expected_os_prod34    = None
     expected_coeff_prod34 = 0
 
     np.random.seed(42)
@@ -66,7 +66,7 @@ def test_anticommutator_pauli():
 
     (coeff_com12, os_com12) = qy.anticommutator(os1, os2)
 
-    expected_os_com12    = qy.OperatorString(['Z', 'Z', 'X'], [2, 4, 6], 'Pauli')
+    expected_os_com12    = None
     expected_coeff_com12 = 0
 
     assert(np.isclose(coeff_com12, expected_coeff_com12) and os_com12 == expected_os_com12)
@@ -128,7 +128,7 @@ def test_commutator_majorana():
     assert(np.isclose(coeff_com12, expected_coeff_com12) and os_com12 == expected_os_com12)
     
     # Check that random Majorana strings commute with themselves.
-    expected_os_prod34    = qy.OperatorString([], [], 'Majorana')
+    expected_os_prod34    = None
     expected_coeff_prod34 = 0
 
     np.random.seed(42)
@@ -150,7 +150,7 @@ def test_anticommutator_majorana():
 
     (coeff_com12, os_com12) = qy.anticommutator(os1, os2)
 
-    expected_os_com12    = qy.OperatorString(['D', 'D', 'A'], [2, 4, 6], 'Majorana')
+    expected_os_com12    = None
     expected_coeff_com12 = 0
 
     assert(np.isclose(coeff_com12, expected_coeff_com12) and os_com12 == expected_os_com12)
@@ -244,5 +244,60 @@ def test_operator_operations():
 
     assert((anticomAB - expected_anticomAB).norm() < 1e-12)
 
+def test_generate_lie_algebra():
 
+    # Check that {X,Y} generates the Lie algebra {X,Y,Z} in two ways.
+
+    # Using a Basis.
+    operators = qy.Basis()
+    operators += qy.opstring('X 0')
+    operators += qy.opstring('Y 0')
+
+    lie_algebra = qy.generate_lie_algebra(operators)
+    op_strings  = set([os for os in lie_algebra])
     
+    expected_op_strings = set([qy.opstring('X 0'), qy.opstring('Y 0'), qy.opstring('Z 0')])
+
+    assert(op_strings == expected_op_strings)
+
+    # Using a list of Operators, [X+Y, X-Y].
+    op1 = qy.Operator([1.0, 1.0], [qy.opstring('X 0'), qy.opstring('Y 0')])
+    op2 = qy.Operator([1.0, -1.0], [qy.opstring('X 0'), qy.opstring('Y 0')])
+    operators = [op1, op2]
+
+    lie_algebra = qy.generate_lie_algebra(operators)
+    op_strings  = set([os for op in lie_algebra for (coeff, os) in op])
+    
+    expected_op_strings = set([qy.opstring('X 0'), qy.opstring('Y 0'), qy.opstring('Z 0')])
+
+    assert(op_strings == expected_op_strings)
+
+    # The set {XX, ZI} generates {XX, ZI, YX, ZY}
+    operators = qy.Basis()
+    operators += qy.opstring('X 0 X 1')
+    operators += qy.opstring('Z 0')
+
+    lie_algebra = qy.generate_lie_algebra(operators)
+    op_strings  = set([os for os in lie_algebra])
+    
+    expected_op_strings = set([qy.opstring('X 0 X 1'), qy.opstring('Z 0'), qy.opstring('Y 0 X 1')])
+    
+    assert(op_strings == expected_op_strings)
+
+    # The set {X_1 + X_2, Y_1 + Y_2} generates {X_1 + X_2, Y_1 + Y_2, Z_1 + Z_2}.
+    op1 = qy.Operator([1.0, 1.0], [qy.opstring('X 0'), qy.opstring('X 1')])
+    op2 = qy.Operator([1.0, 1.0], [qy.opstring('Y 0'), qy.opstring('Y 1')])
+    operators = [1.0/op1.norm() * op1, 1.0/op2.norm() * op2]
+
+    lie_algebra = qy.generate_lie_algebra(operators)
+    op_strings  = set([os for op in lie_algebra for (coeff, os) in op])
+    
+    expected_op_strings = set([qy.opstring('X 0'), qy.opstring('Y 0'), qy.opstring('Z 0'), qy.opstring('X 1'), qy.opstring('Y 1'), qy.opstring('Z 1')])
+
+    assert(op_strings == expected_op_strings)
+
+    op3 = qy.Operator([1.0, 1.0], [qy.opstring('Z 0'), qy.opstring('Z 1')])
+    expected_operators = [1.0/op1.norm() * op1, 1.0/op2.norm() * op2, 1.0/op3.norm() * op3]
+
+    assert(np.all([(opA - opB).norm() < 1e-12 or (opA + opB).norm() for opA in operators for opB in expected_operators]))
+

@@ -13,21 +13,23 @@ on arbitrary lattices.
 
 import warnings
 import numpy as np
+import scipy.sparse as ss
 import itertools as it
 import copy
 
 from .config import *
 from .operatorstring import OperatorString
+
 from .tools import maximal_cliques, compare, cmp_to_key
 
 class Basis:
     """A Basis object represents a basis of operators
-    spanned by OperatorStrings :math:`\hat{h}_a`.
+    spanned by OperatorStrings :math:`\\hat{h}_a`.
         
     Attributes
     ----------
     op_strings : list of OperatorStrings
-        The list of OperatorStrings :math:`\hat{h}_a` to store in the Basis.
+        The list of OperatorStrings :math:`\\hat{h}_a` to store in the Basis.
     """
     
     def __init__(self, op_strings=None):
@@ -263,18 +265,18 @@ class Basis:
 
 class Operator:
     """An Operator object represents a quantum operator
-    :math:`\hat{\mathcal{O}}=\sum_a g_a \hat{h}_a` that is a linear
-    combination of OperatorStrings :math:`\hat{h}_a`.
+    :math:`\\hat{\\mathcal{O}}=\\sum_a g_a \\hat{h}_a` that is a linear
+    combination of OperatorStrings :math:`\\hat{h}_a`.
         
     Attributes
     ----------
     coeffs : list or ndarray of complex
         The coefficients :math:`g_a` in front of the 
-        OperatorStrings :math:`\hat{h}_a`. If all 
+        OperatorStrings :math:`\\hat{h}_a`. If all 
         coefficients are real, then the operator
         is Hermitian.
     op_strings : list of OperatorStrings
-        The OperatorStrings :math:`\hat{h}_a` that 
+        The OperatorStrings :math:`\\hat{h}_a` that 
         make up this operator.
     op_type : str
         The type of OperatorStrings that make up the 
@@ -361,26 +363,26 @@ class Operator:
         
         # Create a new operator with copies of the old
         # operators' information, excluding the zeros.
-        new_operator = Operator(new_coeffs, new_op_strings)
+        new_operator = Operator(new_coeffs, new_op_strings, op_type=self.op_type)
 
         return new_operator
 
     def norm(self, order=None):
         """Compute the Hilbert-Schmidt norm of the Operator. 
 
-        For an Operator :math:`\hat{\mathcal{O}}=\sum_a g_a \hat{h}_a`  
-        made of orthonormal OperatorStrings :math:`\hat{h}_a` 
-        that satisfy :math:`\\langle \hat{h}_a, \hat{h}_b\\rangle = \\textrm{tr}(\hat{h}_a^\dagger \hat{h}_b)/\\textrm{tr}(\hat{I}) =\delta_{ab}`,
+        For an Operator :math:`\\hat{\\mathcal{O}}=\\sum_a g_a \\hat{h}_a`  
+        made of orthonormal OperatorStrings :math:`\\hat{h}_a` 
+        that satisfy :math:`\\langle \\hat{h}_a, \\hat{h}_b\\rangle = \\textrm{tr}(\\hat{h}_a^\\dagger \\hat{h}_b)/\\textrm{tr}(\\hat{I}) =\\delta_{ab}`,
         the (squared) Hilbert-Schmidt norm is
-            :math:`||\hat{\mathcal{O}}||^2 = \sum_a g_a^2`
-        which is just the :math:`\ell_2`-norm of the :math:`g_a`
+            :math:`||\\hat{\\mathcal{O}}||^2 = \\sum_a g_a^2`
+        which is just the :math:`\\ell_2`-norm of the :math:`g_a`
         vector.
 
         Parameters
         ----------
         order : {non-zero int, inf, -inf, 'fro', 'nuc'}, optional
             Order of the norm (see `numpy.norm`). Defaults to None,
-            which is the :math:`\ell_2`-norm. Another useful norm
+            which is the :math:`\\ell_2`-norm. Another useful norm
             is the `inf` order norm, which returns the maximum
             :math:`|g_a|` value.
 
@@ -408,7 +410,7 @@ class Operator:
         ----------
         order : {non-zero int, inf, -inf, 'fro', 'nuc'}, optional
             Order of the norm (see `numpy.norm`). Defaults to None,
-            which is the :math:`\ell_2`-norm. Another useful norm
+            which is the :math:`\\ell_2`-norm. Another useful norm
             is the `inf` order norm, which returns the maximum
             :math:`|g_a|` value.
 
@@ -421,7 +423,7 @@ class Operator:
         
         self.coeffs /= self.norm(order=order)
 
-    def to_vector(self, basis):
+    def to_vector(self, basis, fmt='numpy'):
         """Convert the Operator to a vector
         in the given Basis of OperatorStrings.
 
@@ -430,21 +432,42 @@ class Operator:
         basis : Basis
             The Basis of OperatorStrings in which
             to represent the Operator as a vector.
+        fmt : str
+            The array format to return the vector
+            as. Specifying 'numpy' returns a ndarray
+            of shape (n,); 'csc' returns a scipy.sparse.csc_matrix
+            of shape (n,1). Defaults to 'numpy'.
 
         Returns
         -------
-        ndarray
+        ndarray or scipy.sparse.csc_matrix
             The vector representation of the Operator.
         """
 
-        vector = np.zeros(len(basis), dtype=complex)
-        
-        for (coeff, op_string) in self:
-            ind_vec = basis.index(op_string)
-            vector[ind_vec] = coeff
+        if fmt == 'numpy':
+            vector = np.zeros(len(basis), dtype=complex)
+            
+            for (coeff, op_string) in self:
+                ind_vec = basis.index(op_string)
+                vector[ind_vec] = coeff
 
-        return vector
-        
+            return vector
+        elif fmt == 'csc':
+            row_inds = []
+            data     = []
+            
+            for (coeff, op_string) in self:
+                ind_vec = basis.index(op_string)
+                row_inds.append(ind_vec)
+                data.append(coeff)
+
+            col_inds = [0]*len(row_inds)
+            vector = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
+            
+            return vector
+        else:
+            raise ValueError('Cannot create a vector representation of the Operator with fmt {}'.format(fmt))    
+                
     def __add__(self, other):
         """Add an Operator to this Operator.
 
@@ -836,18 +859,7 @@ def cluster_basis(k, cluster_labels, op_type, include_identity=False):
     
     return Basis(op_strings)
 
-def _symmetrize_opstring(op_string, symmetry_group):
-    """From an operator string h_a and a symmetry group G,
-    computes a symmetrized operator \sum_{g \in G} g h_a.
-    """
-    
-    symmetrized_op = Operator([], [], op_string.op_type)
-    for g in symmetry_group:
-        symmetrized_op += g.apply(op_string)
-
-    return symmetrized_op
-
-def distance_basis(lattice, k, R, op_type, points=None, include_identity=False, tol=1e-10):
+def distance_basis(lattice, k, R, op_type, allowed_orbitals=None, include_identity=False, tol=1e-10):
     """Constructs a Basis of OperatorStrings 
     made of orbitals that are spatially local.
 
@@ -865,10 +877,9 @@ def distance_basis(lattice, k, R, op_type, points=None, include_identity=False, 
     op_type : str
         The type of OperatorStrings in the Basis: 
         'Pauli', 'Fermion', or 'Majorana'.
-    points : list of ndarray, optional
+    allowed_orbitals : list or ndarray of int, optional
         If provided, the OperatorStrings in the Basis must
-        be at most a distance R away from these points rather
-        than the positions of the atoms in the lattice.
+        be composed of only orbitals with these labels.
         Defaults to None.
     include_identity : bool, optional
         Specifies whether to include the identity operator in the Basis.
@@ -888,27 +899,43 @@ def distance_basis(lattice, k, R, op_type, points=None, include_identity=False, 
     To construct all possible (traceless) 1 and 2-site operators 
     made of nearest and next-nearest neighbor Pauli strings on 
     a periodic chain of twelve sites, one can use
-        >>> lattice = qosy.chain_lattice(12, periodic=True)
-        >>> basis   = qosy.distance_basis(lattice, 2, 2.0, 'Pauli')
+        >>> lattice = qosy.lattice.chain(12, periodic=True)
+        >>> basis   = qosy.distances_basis(lattice, 2, 2.0, 'Pauli')
     """
-
-    # Store the distances between the orbitals into a matrix.
+    
     num_orbitals = len(lattice)
-    distances    = np.zeros((num_orbitals, num_orbitals))
+    
+    if allowed_orbitals is None:
+        allowed_orbitals = np.arange(num_orbitals)
+    
+    # Store the distances between the orbitals into a matrix.
+    distances = np.zeros((num_orbitals, num_orbitals))
     for ind1 in range(num_orbitals):
         for ind2 in range(ind1+1,num_orbitals):
             distances[ind1,ind2] = lattice.distance(ind1, ind2)
             distances[ind2,ind1] = distances[ind1,ind2]
 
     # For each orbital, compute which orbitals are within distance R.
-    orbitals_within_R = [[ind2 for ind2 in range(num_orbitals) if distances[ind1,ind2] <= R+tol and ind2 != ind1] for ind1 in range(num_orbitals)]
+    orbitals_within_R = [[ind2 for ind2 in allowed_orbitals if distances[ind1,ind2] <= R+tol and ind2 != ind1] for ind1 in range(num_orbitals)]
 
     # The clusters are maximal cliques of the graph
     # with orbitals as nodes and nodes marked as adjacent
     # if they are within a distance R of each other
     # in real space.
-    clusters = maximal_cliques(orbitals_within_R)
+    cliques = maximal_cliques(orbitals_within_R)
 
+    # Only include clusters containing allowed orbitals.
+    clusters = []
+    for clique in cliques:
+        allowed = True
+        for orbital_label in clique:
+            if orbital_label not in allowed_orbitals:
+                allowed = False
+                break
+
+        if allowed:
+            clusters.append(clique)
+    
     # Sort the clusters for consistency.
     sorted_clusters = sorted(clusters, key=cmp_to_key(compare))
     
@@ -917,48 +944,3 @@ def distance_basis(lattice, k, R, op_type, points=None, include_identity=False, 
         total_basis += cluster_basis(k, cluster_labels, op_type)
         
     return total_basis
-
-# TODO: test
-def symmetrize(basis, symmetry_group, tol=1e-10):
-    """Symmetrize a basis so that its basis
-    vectors are invariant under the given
-    discrete symmetries.
-
-    Parameters
-    ----------
-    basis : Basis
-        The Basis of OperatorStrings to symmetrize.
-    symmetry_group : list of Transformations
-        All of the desired discrete symmetry 
-        transformations of the symmetry group.
-    tol : float, optional
-        The tolerance used to compare distances 
-        between orbitals. Default is 1e-10.
-
-    Returns
-    -------
-    list of Operators
-        The symmetrized basis, represented as a 
-        list of Operators. Each Operator obeys 
-        the given space group symmetries.
-    """
-
-    # The symmetrized basis will be a list of Operators
-    # that obey the given discrete group symmetries.
-    symmetrized_basis  = []
-    visited_op_strings = set()
-    for op_string in basis:
-        if op_string in visited_op_strings:
-            continue
-        
-        symmetrized_op = _symmetrize_opstring(op_string, symmetry_group)
-
-        for (coeff, visited_op_string) in symmetrized_op:
-            visited_op_strings.add(visited_op_string)
-            
-        symmetrized_op.remove_zeros()
-        symmetrized_op.normalize()
-
-        symmetrized_basis.append(symmetrized_op)
-        
-    return symmetrized_basis
