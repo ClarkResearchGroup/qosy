@@ -213,6 +213,17 @@ class OperatorString:
         
         return equals
 
+    def __iter__(self):
+        """Return an iterator over the operators and labels
+        of the OperatorString.
+
+        Returns
+        -------
+        iterator of tuple of (str, int)
+        """
+        
+        return iter(zip(self.orbital_operators, self.orbital_labels))
+
 def opstring(op_string_name, op_type=None):
     """Construct an OperatorString from a python string description.
     
