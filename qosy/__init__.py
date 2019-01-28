@@ -15,7 +15,7 @@ from .symmetrization  import symmetrize_basis, symmetrize_lattice
 from .diagonalization import to_matrix, to_vector, to_operator, diagonalize, diagonalize_quadratic
 
 # Loads additional operator string algorithms.
-from .algorithms import selected_ci1, selected_ci2
+from .algorithms import selected_ci
 
 # Loads the utility functions.
 from .tools           import *

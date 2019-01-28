@@ -120,7 +120,7 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
     return (s_constants, extended_basis)
 
 # TODO: document
-def selected_ci1(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=100):
+def selected_ci_simple(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=100):
     
     basis = Basis()
     basis += initial_operator._basis
@@ -144,12 +144,12 @@ def selected_ci1(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=
 
         # Find best operator in basis
         com_matrix = commutant_matrix(basis, H)
-        CDagC = (com_matrix.H).dot(com_matrix)
+        CDagC = ((com_matrix.H).dot(com_matrix)).real
 
         if len(basis) < 20:
             (evals, evecs) = nla.eigh(CDagC.toarray())
         else:
-            (evals, evecs) = ssla.eigsh(CDagC, k=4, which='SM')
+            (evals, evecs) = ssla.eigsh(CDagC, k=8, which='SM')
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
             evecs = evecs[:, inds_sort]
@@ -169,16 +169,16 @@ def selected_ci1(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=
     return (best_operator, best_com_norm, operators, com_norms)
 
 # TODO: document
-def selected_ci2(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=100, explored_basis=None, explored_extended_basis=None, explored_s_constants_data=None):
+def selected_ci(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=100, explored_data=None):
 
     # Keep track of all OperatorStrings considered
     # during the calculation.
-    if explored_basis is None:
+    if explored_data is None:
         explored_basis = Basis()
-    if explored_extended_basis is None:
         explored_extended_basis = Basis()
-    if explored_s_constants_data is None:
         explored_s_constants_data = [([],[],[])]*len(H)
+    else:
+        (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
     
     basis = Basis()
     basis += initial_operator._basis
@@ -190,24 +190,31 @@ def selected_ci2(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=
 
     best_operator = copy.deepcopy(initial_operator)
     best_com_norm = np.inf
-    
-    for step in range(num_steps):       
+
+    previous_basis = copy.deepcopy(basis)
+    for step in range(num_steps):
         # Expand basis twice.
         (_, temp_extended_basis) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
         basis += temp_extended_basis
         (_, temp_extended_basis) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
         basis += temp_extended_basis
+
+        # End early if the algorithm has converged to a basis.
+        if set(basis.op_strings) == set(previous_basis.op_strings):
+            break
+        else:
+            previous_basis = copy.deepcopy(basis)
         
         print('Expanded basis: {}'.format(len(basis)))
 
         # Find best operator in basis
         (s_constants, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
-        CDagC = _cdagc(s_constants, H)
+        CDagC = _cdagc(s_constants, H).real
         
         if len(basis) < 20:
             (evals, evecs) = nla.eigh(CDagC.toarray())
         else:
-            (evals, evecs) = ssla.eigsh(CDagC, k=4, which='SM')
+            (evals, evecs) = ssla.eigsh(CDagC, k=8, sigma=-1e-2)
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
             evecs = evecs[:, inds_sort]
