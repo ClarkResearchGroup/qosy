@@ -5,16 +5,18 @@ This module provides functions for symmetrizing Bases and Lattices.
 """
 
 import numpy as np
+import numpy.linalg as nla
 import copy
 
 from .lattice import UnitCell, Lattice
 from .basis import Operator
 from .transformation import label_permutation
-from .tools import remove_duplicates, compose_permutations
+from .tools import remove_duplicates, compose_permutations, argsort
 
 def _symmetrize_opstring(op_string, symmetry_group):
-    """From an operator string h_a and a symmetry group G,
-    computes a symmetrized operator \\sum_{g \\in G} g h_a.
+    """Helper function to `symmetrize_basis`. 
+    From an operator string h_a and a symmetry group G,
+    computes  a symmetrized operator \\sum_{g \\in G} g h_a.
     """
     
     symmetrized_op = Operator([], [], op_string.op_type)
@@ -89,7 +91,7 @@ def symmetrize_basis(basis, group_generators, tol=1e-12):
         for (coeff, visited_op_string) in symmetrized_op:
             visited_op_strings.add(visited_op_string)
             
-        symmetrized_op.remove_zeros()
+        symmetrized_op = symmetrized_op.remove_zeros()
 
         # Ignore zero operators.
         if symmetrized_op.norm() > tol:
@@ -97,6 +99,108 @@ def symmetrize_basis(basis, group_generators, tol=1e-12):
             symmetrized_basis.append(symmetrized_op)
         
     return symmetrized_basis
+
+def _symmetrize_atoms(lattice, G, tol=1e-12):
+    # Helper function to `symmetrize_lattice`. Constructs
+    # a new lattice with all atoms (and their orbitals)
+    # symmetrized by the symmetry group transformations.
+
+    sym_atom_info = list(zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals))
+
+    result = []
+    for (pos, orbs) in sym_atom_info:
+        for g in G:
+            new_pos = np.dot(g, pos)
+
+            result.append((new_pos, orbs))
+
+    sym_atom_info = result
+
+    # Sort the atom positions
+    # by their distance from the origin.
+    # Break ties by considering the distance
+    # from the origin along each axis.
+    distances = [(nla.norm(pos),)+tuple(np.abs(pos))+tuple(pos) for (pos, _) in sym_atom_info]
+    def _comp(ind1, ind2):
+        tup1 = distances[ind1]
+        tup2 = distances[ind2]
+
+        # Ignore equal entries.
+        comparison_vec = np.abs(np.array(tup1) - np.array(tup2)) < tol
+        index_tup = 0
+        while comparison_vec[index_tup] and index_tup < len(tup1)-1:
+            index_tup += 1
+
+        # Use the last unequal entry for comparison.
+        if comparison_vec[index_tup]:
+            return 0
+        else:
+            return tup1[index_tup] - tup2[index_tup]
+
+    inds_sort = argsort(distances, comp=_comp)
+    sym_atom_info = [sym_atom_info[ind] for ind in inds_sort]
+
+    # Construct the unit cell.
+    new_unit_cell = UnitCell(lattice.unit_cell.lattice_vectors)
+    for (pos, orbs) in sym_atom_info:
+        new_unit_cell.add_atom(pos, orbs)
+
+    # Construct the lattice.
+    new_lattice = Lattice(new_unit_cell, (1,)*lattice.dim, periodic_boundaries=lattice.periodic_boundaries)
+
+    return new_lattice
+
+def _expand_lattice(lattice, ind_lattice_vector, delta):
+    # Helper function to `symmetrize_lattice`. Expands
+    # the lattice in a given lattice vector
+    # direction.
+
+    # First, extend the specified lattice vector
+    # by the given amount.
+    lattice.unit_cell.lattice_vectors[ind_lattice_vector] += delta
+
+    # Second, enlarge the unit cell by shifting all
+    # atoms in the unit cell by this amount as well.
+    new_atom_pos  = list(lattice.unit_cell.atom_positions) \
+                    + [delta + pos for pos in lattice.unit_cell.atom_positions]
+    new_atom_orbs = list(lattice.unit_cell.atom_orbitals)*2
+
+    new_unit_cell = UnitCell(lattice.unit_cell.lattice_vectors,
+                             atom_positions=new_atom_pos,
+                             atom_orbitals=new_atom_orbs)
+
+    new_lattice = Lattice(new_unit_cell, (1,)*lattice.dim, periodic_boundaries=lattice.periodic_boundaries)
+
+    return new_lattice
+
+def _remove_duplicate_atoms(lattice, tol=1e-12):
+    # Helper function for `symmetrize_lattice`.
+    # Returns a new lattice with the
+    # duplicate atoms from the lattice
+    # removed.
+
+    sym_atom_info = list(zip(lattice.unit_cell.atom_positions, lattice.unit_cell.atom_orbitals))
+
+    # Function for comparing equality of atoms.
+    # Compares their positions and orbitals in
+    # the lattice.
+    def _equiv(infoA, infoB):
+        (posA, orbsA) = infoA
+        (posB, orbsB) = infoB
+        return lattice.distance(posA, posB) < tol and orbsA == orbsB
+
+    # Remove duplicate atoms.
+    sym_atom_info = remove_duplicates(sym_atom_info, equiv=_equiv)
+
+    # Construct the unit cell.
+    new_unit_cell = UnitCell(lattice.unit_cell.lattice_vectors)
+    for (pos, orbs) in sym_atom_info:
+        new_unit_cell.add_atom(pos, orbs)
+
+    # Construct the lattice.
+    new_lattice = Lattice(new_unit_cell, (1,)*lattice.dim, periodic_boundaries=lattice.periodic_boundaries)
+
+    return new_lattice
 
 # TODO: test
 def symmetrize_lattice(lattice, point_group_generators, num_expansions=1, tol=1e-12):

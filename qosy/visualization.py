@@ -421,7 +421,7 @@ def plot_opstring(op_string, lattice, distance_cutoff=None, weight=1.0, marker_s
             if lattice.dim == 1:
                 pos = np.array([pos[0], 0.0])
         
-            plt.plot([pos[0]], [pos[1]], color=markercolors[orb_op], markeredgecolor=markercolors[orb_op], alpha=0.5*np.abs(weight), markersize=marker_size)
+            plt.plot([pos[0]], [pos[1]], 'o', color=markercolors[orb_op], markeredgecolor=markercolors[orb_op], alpha=0.5*np.abs(weight), markersize=marker_size)
 
             if orb_name != '':
                 plt.annotate(orb_name, xy=(pos[0],pos[1]), color='k')
@@ -439,7 +439,6 @@ def plot_opstring(op_string, lattice, distance_cutoff=None, weight=1.0, marker_s
                 pos1 = np.array([pos1[0], 0.0])
                 pos2 = np.array([pos2[0], 0.0])
 
-            # TODO: finish
             if distance_cutoff is not None:
                 if nla.norm(pos1-pos2) > distance_cutoff:
                     return
@@ -459,7 +458,24 @@ def plot_opstring(op_string, lattice, distance_cutoff=None, weight=1.0, marker_s
             else:
                 plt.plot([pos1[0], pos2[0]], [pos1[1], pos2[1]], 'r-', linewidth=max_width*np.abs(weight), alpha=0.5*np.abs(weight))
         else:
-            raise NotImplementedError('No supported visualization for operators on more than two sites yet.')
+            positions = [lattice._orbitals[orb_label][0] for (orb_op, orb_label) in op_string]
+
+            xs = [pos[0] for pos in positions]
+            ys = [pos[1] for pos in positions]
+            
+            if distance_cutoff is not None:
+                distances = [nla.norm(pos1-pos2) for pos1 in positions for pos2 in positions]
+                max_distance = np.max(distances)
+                
+                if max_distance > distance_cutoff:
+                    return
+
+            # Plot many-orbital operators as polygons.
+            if weight > 0:
+                plt.fill(xs, ys, color='b', alpha=0.5*np.abs(weight))
+            else:
+                plt.fill(xs, ys, color='r', alpha=0.5*np.abs(weight))
+            
     # 3D plot
     elif lattice.dim == 3:
         fig = plt.gcf()

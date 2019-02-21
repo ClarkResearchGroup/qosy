@@ -48,6 +48,20 @@ def test_sort_sign():
     assert(np.allclose(np.array(sorted_arr), expected_sorted_arr))
     assert(sign == expected_sign)
 
+def test_sort_sign_mergesort():
+    np.random.seed(42)
+    num_trials = 100
+    arr_length = 100
+
+    for ind_trial in range(num_trials):
+        arr = 2.0*np.random.rand(arr_length) - 1.0
+
+        (sorted_arr1, sign1) = qy.tools.sort_sign(arr, method='insertionsort')
+        (sorted_arr2, sign2) = qy.tools.sort_sign(arr, method='mergesort')
+        
+        assert(np.allclose(sorted_arr1, sorted_arr2))
+        assert(np.isclose(sign1, sign2))
+        
 def test_compare():
     assert(qy.tools.compare((0,1), (0,)) > 0)
     assert(qy.tools.compare((0,1), (0,1)) == 0)
