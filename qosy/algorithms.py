@@ -728,13 +728,21 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
             
         # Skip CDagC calculation if the algorithm has converged to a basis.
         if step > 0 and set(basis.op_strings) == set(previous_basis.op_strings):
-            break
+            if num_H_terms >= max_basis_size:
+                break
+            else:
+                num_H_terms *= 2
+                print(' num_H_terms = {}'.format(num_H_terms))
         # Also if it gets into a cycle of switching between two bases.
         elif step > 0 and previous_previous_basis is not None and set(basis.op_strings) == set(previous_previous_basis.op_strings):
-            break
-        else:
-            previous_previous_basis = copy.deepcopy(previous_basis)
-            previous_basis = copy.deepcopy(basis)
+            if num_H_terms >= max_basis_size:
+                break
+            else:
+                num_H_terms *= 2
+                print(' num_H_terms = {}'.format(num_H_terms))
+        
+        previous_previous_basis = copy.deepcopy(previous_basis)
+        previous_basis = copy.deepcopy(basis)
             
         # Find best operator in basis
         (s_constants, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
