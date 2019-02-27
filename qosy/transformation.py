@@ -86,6 +86,7 @@ class Transformation:
                     raise NotImplementedError('Operators with complex coefficients are currently not supported with transformations (time-reversal might behave incorrectly).')
                 
                 result += coeff * self.rule(op_string, self.info)
+            return result
         else:
             raise TypeError('Cannot apply the transformation to object of type {}'.format(type(operator)))
 
