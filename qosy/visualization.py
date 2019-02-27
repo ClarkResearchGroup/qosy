@@ -106,7 +106,7 @@ def print_vectors(basis, vectors, lattice=None, keywords=None, convert_to=None, 
         If provided, convert orbital labels to 
         lattice coordinate labels. Defaults to None.
     keywords : list of str, optional
-        If provided (along with lattice), only prints
+        If provided, only prints
         OperatorStrings whose string representation
         include the given keywords. Defaults to None.
     convert_to : str, optional
@@ -142,17 +142,17 @@ def print_vectors(basis, vectors, lattice=None, keywords=None, convert_to=None, 
         if lattice is not None:
             output_string = relabel_orbitals(output_string, lattice)
 
-            # Filter out all the OperatorStrings
-            # that contain the given keywords.
-            if keywords is not None:
-                new_output_string = ''
-                for line in output_string.split('\n'):
-                    for keyword in keywords:
-                        if keyword in line:
-                            new_output_string += line+'\n'
-                            break
+        # Filter out all the OperatorStrings
+        # that contain the given keywords.
+        if keywords is not None:
+            new_output_string = ''
+            for line in output_string.split('\n'):
+                for keyword in keywords:
+                    if keyword in line:
+                        new_output_string += line+'\n'
+                        break
 
-                output_string = new_output_string
+            output_string = new_output_string
             
         print(output_string)
         
@@ -169,7 +169,7 @@ def print_operators(operators, lattice=None, keywords=None, convert_to=None, nor
         If provided, convert orbital labels to 
         lattice coordinate labels. Defaults to None.
     keywords : list of str, optional
-        If provided (along with lattice), only prints
+        If provided, only prints
         OperatorStrings whose string representation
         include the given keywords. Defaults to None.
     convert_to : str, optional
@@ -201,17 +201,17 @@ def print_operators(operators, lattice=None, keywords=None, convert_to=None, nor
         if lattice is not None:
             output_string = relabel_orbitals(output_string, lattice)
 
-            # Filter out all the OperatorStrings
-            # that contain the given keywords.
-            if keywords is not None:
-                new_output_string = ''
-                for line in output_string.split('\n'):
-                    for keyword in keywords:
-                        if keyword in line:
-                            new_output_string += line+'\n'
-                            break
+        # Filter out all the OperatorStrings
+        # that contain the given keywords.
+        if keywords is not None:
+            new_output_string = ''
+            for line in output_string.split('\n'):
+                for keyword in keywords:
+                    if keyword in line:
+                        new_output_string += line+'\n'
+                        break
 
-                output_string = new_output_string
+            output_string = new_output_string
             
         print(output_string)
 

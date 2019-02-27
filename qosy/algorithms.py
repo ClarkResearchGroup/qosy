@@ -69,6 +69,34 @@ def _cdagc(s_constants, operator):
         
     return CDagC
 
+def _orthogonalize_cdagc(CDagC, basis, orth_ops):
+    # Update C_H^\dagger C_H to make its
+    # ground state orthogonal to the given
+    # operators.
+
+    new_CDagC = CDagC.copy()
+    
+    # Create a projection matrix that projects
+    # out of the space spanned by the given operators.
+    proj_ops = ss.csr_matrix((len(basis),len(basis)), dtype=complex)
+    for orth_op in orth_ops:
+        row_inds = []
+        col_inds = []
+        data     = []
+        for (coeff, os) in orth_op:
+            if os in basis:
+                data.append(coeff)
+                row_inds.append(basis.index(os))
+                col_inds.append(0)
+        orth_vec = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
+
+        proj_ops += orth_vec.dot(orth_vec.H)
+        
+    large_number = 1e12
+    new_CDagC += large_number * proj_ops
+
+    return new_CDagC.real
+    
 def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data, allowed_labels=None):
     # Explore the space of OperatorStrings, starting from
     # the given Basis. Update the explored_basis, explored_extended_basis,
@@ -603,7 +631,7 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
 # TODO: document, test
 # Idea: Expand the basis by commuting with the largest terms in H
 # and anticommuting with the largest terms in O.
-def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0):
+def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None):
 
     H_labels = np.array([label for os in H._basis for (_, label) in os], dtype=int)
     max_label = np.max(H_labels)
@@ -664,11 +692,21 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
         
         num_lterms = np.minimum(len(com_H_A), num_H_terms)
         inds_largest_termsB = np.argsort(np.abs(com_H_A))[::-1]
-        inds_largest_termsB = inds_largest_termsB[0:num_lterms]
+        #inds_largest_termsB = inds_largest_termsB[0:num_lterms]
         
         # Insert B into the basis
-        basis += Basis([extended_basis2[ind] for ind in inds_largest_termsB])
-
+        num_terms_added = 0
+        for ind in inds_largest_termsB:
+            os = extended_basis2[ind]
+            if os not in basis:
+                basis += os
+                num_terms_added += 1
+            if num_terms_added >= num_lterms:
+                break
+            
+        #basis += Basis([extended_basis2[ind] for ind in inds_largest_termsB])
+        #basis += extended_basis2
+        
         # ==== 2nd step: {O, O} to generate new terms ====
         num_lterms = np.minimum(len(operator.coeffs), num_O_terms)
         inds_largest_terms_O = np.argsort(np.abs(operator.coeffs))[::-1]
@@ -724,7 +762,8 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
                 if num_terms_added >= num_lterms:
                     break
 
-        print('Step {}: Basis = {}'.format(step, len(basis)))
+        if verbose:
+            print('Step {}: Basis = {}'.format(step, len(basis)))
             
         # Skip CDagC calculation if the algorithm has converged to a basis.
         if step > 0 and set(basis.op_strings) == set(previous_basis.op_strings):
@@ -732,14 +771,16 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
                 break
             else:
                 num_H_terms *= 2
-                print(' num_H_terms = {}'.format(num_H_terms))
+                if verbose:
+                    print(' num_H_terms = {}'.format(num_H_terms))
         # Also if it gets into a cycle of switching between two bases.
         elif step > 0 and previous_previous_basis is not None and set(basis.op_strings) == set(previous_previous_basis.op_strings):
             if num_H_terms >= max_basis_size:
                 break
             else:
                 num_H_terms *= 2
-                print(' num_H_terms = {}'.format(num_H_terms))
+                if verbose:
+                    print(' num_H_terms = {}'.format(num_H_terms))
         
         previous_previous_basis = copy.deepcopy(previous_basis)
         previous_basis = copy.deepcopy(basis)
@@ -747,7 +788,11 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
         # Find best operator in basis
         (s_constants, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
         CDagC = _cdagc(s_constants, H).real
-        
+
+        # Orthogonalize against the given operators.
+        if orth_ops is not None:
+            CDagC = _orthogonalize_cdagc(CDagC, basis, orth_ops)
+
         if len(basis) < 20:
             (evals, evecs) = nla.eigh(CDagC.toarray())
         else:
@@ -771,10 +816,59 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
         
         # Truncate basis
         basis = _truncate_basis(basis, evecs[:,0], threshold=threshold, max_basis_size=max_basis_size)
-        print('  Truncated basis: {}'.format(len(basis)))
+        if verbose:
+            print('  Truncated basis: {}'.format(len(basis)))
 
         # Truncate the operator into the new basis
         new_coeffs = [vector[basis.index(os)] for os in basis]
         operator = Operator(new_coeffs, basis.op_strings)
         
     return (best_operator, best_com_norm, operators, com_norms)
+
+# TODO: document, test
+# Idea: Try to iteratively find many operators that commute with H.
+def selected_ci_greedy_many_ops(initial_operators, H, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True):
+    
+    # Keep track of how OperatorStrings
+    # commute with H during the calculation.
+    if explored_data is None:
+        explored_basis = Basis()
+        explored_extended_basis = Basis()
+        explored_s_constants_data = [([],[],[])]*len(H)
+    else:
+        (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
+
+    result_operators = []
+    result_com_norms = []
+        
+    current_operators = copy.deepcopy(initial_operators)
+    num_operators = len(current_operators)
+    
+    for step in range(num_steps):
+        if verbose:
+            print('==== STEP {}/{} ===='.format(step+1, num_steps))
+
+        step_operators = []
+        step_com_norms = []
+        for ind_op in range(num_operators):
+            if verbose:
+                print('  (( OPERATOR {}/{} ))  '.format(ind_op+1, num_operators))
+
+            # Orthogonalize against the other operators.
+            orth_ops = [current_operators[ind] for ind in range(num_operators) if ind != ind_op]
+                
+            current_op = current_operators[ind_op]
+
+            # TODO: truncate the operator.
+            
+            (_, _, ops, c_norms) = selected_ci_greedy(current_op, H, 1, num_H_terms=num_H_terms, num_O_terms=num_O_terms, threshold=threshold, max_basis_size=max_basis_size, explored_data=explored_data, maxiter_scale=maxiter_scale, tol=tol, verbose=verbose, orth_ops=orth_ops)
+
+            current_operators[ind_op] = copy.deepcopy(ops[-1])
+            
+            step_operators.append(ops[0])
+            step_com_norms.append(c_norms[0])
+        
+        result_operators.append(step_operators)
+        result_com_norms.append(step_com_norms)
+        
+    return (result_operators, result_com_norms)

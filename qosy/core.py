@@ -378,7 +378,7 @@ class SymmetricOperatorGenerator:
                 # Compute the projected superoperator's eigenvalues and eigenvectors.
                 if self.num_vecs[ind_output] is not None:
                     # Using scipy.sparse.linalg.eigsh
-                    sigma = -1e-2
+                    sigma = -1e-6
                     (evalsPSO, evecsPSO) = ssla.eigsh(projected_superoperator, k=self.num_vecs[ind_output], sigma=sigma)
                 else:
                     # Using numpy.linalg.eigh

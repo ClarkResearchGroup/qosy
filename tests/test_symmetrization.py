@@ -1,6 +1,55 @@
 from .context import qosy as qy
 import numpy as np
 
+def test_symmetrize_basis_Majorana():
+    # test 1
+    basis = qy.Basis([qy.opstring('A 0 D 1 D 2 D 3'), \
+                      qy.opstring('D 0 A 1 D 2 D 3'), \
+                      qy.opstring('D 0 D 1 A 2 D 3'), \
+                      qy.opstring('D 0 D 1 D 2 A 3')])
+
+    # Translation by a site
+    R = qy.label_permutation([1,2,3,0])
+
+    sym_basis = qy.symmetrize_basis(basis, [R])
+
+    expected_op = qy.Operator(0.5*np.ones(4), basis.op_strings)
+    
+    assert(len(sym_basis) == 1 and (sym_basis[0]-expected_op).norm() < 1e-12)
+
+    # test 2
+    basis = qy.Basis([qy.opstring('A 0 A 1 D 2 D 3'), \
+                      qy.opstring('D 0 A 1 A 2 D 3'), \
+                      qy.opstring('D 0 D 1 A 2 A 3'), \
+                      qy.opstring('A 0 D 1 D 2 A 3')])
+
+    # Translation by a site
+    R = qy.label_permutation([1,2,3,0])
+
+    sym_basis = qy.symmetrize_basis(basis, [R])
+
+    expected_op = qy.Operator(0.5*np.array([1,1,1,-1]), basis.op_strings)
+    
+    assert(len(sym_basis) == 1 and (sym_basis[0]-expected_op).norm() < 1e-12)
+
+    # test 3
+    basis = qy.Basis([qy.opstring('D 0 A 1 A 2 D 3'), \
+                      qy.opstring('D 0 D 1 A 2 A 3'), \
+                      qy.opstring('A 0 D 1 D 2 A 3'), \
+                      qy.opstring('A 0 A 1 D 2 D 3')])
+
+    # Translation by a site
+    R = qy.label_permutation([1,2,3,0])
+
+    sym_basis = qy.symmetrize_basis(basis, [R])
+
+    for op in sym_basis:
+        print(op)
+
+    expected_op = qy.Operator(0.5*np.array([1,1,-1,1]), basis.op_strings)
+    
+    assert(len(sym_basis) == 1 and (sym_basis[0]-expected_op).norm() < 1e-12)
+    
 # TODO: finish, debug, test
 def test_symmetrize_basis_D4():
     # D_4 symmetric square with for orbitals

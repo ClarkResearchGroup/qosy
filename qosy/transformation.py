@@ -192,11 +192,11 @@ def _permutation_rule(op_string_A, info):
     op_string_B = OperatorString(new_ops, new_labels, op_string_A.op_type)
 
     if op_string_A.op_type == 'Majorana':
-        inds_ab_sorted = [ind for ind in inds_sorted if new_ops[ind] in ['A','B']]
+        inds_ab_unsorted = [new_labels_unsorted[ind] for ind in range(len(labels)) if ops[ind] in ['A', 'B']]
         
         # Make sure to compute the sign acquired from reordering
         # A and B operators in the Majorana strings.
-        (_, sign) = sort_sign(inds_ab_sorted)
+        (_, sign) = sort_sign(inds_ab_unsorted)
         
         # Also, account for the prefactors in front of the Majorana
         # string operators before and after the transformation.
