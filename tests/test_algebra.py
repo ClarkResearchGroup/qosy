@@ -194,9 +194,10 @@ def test_structure_constants_simple():
 
     expected_structure_constants = np.array([[0,-2j,0],[0,0,2j]],dtype=complex)
     
-    (structure_constants_list, basisC) = qy.algebra.structure_constants(basisA, basisB, return_extended_basis=True)
+    (structure_constants_dict, basisC) = qy.algebra.structure_constants(basisA, basisB, return_extended_basis=True)
 
-    assert(np.allclose(structure_constants_list[0].toarray(), expected_structure_constants))
+    osB = op_strings_basisB[0]
+    assert(np.allclose(structure_constants_dict[osB].toarray(), expected_structure_constants))
 
     assert(set(basisC.op_strings) == set(expected_basisC.op_strings))
 

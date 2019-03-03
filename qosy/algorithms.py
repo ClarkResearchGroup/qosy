@@ -48,14 +48,15 @@ def _com_matrix(s_constants, operator):
     # Computes C_O, where C_O is the
     # commutant matrix of operator O,
     # from the structure constants and O.
-    
-    dim_extended_basis = int(s_constants[0].shape[0])
-    dim_basis          = int(s_constants[0].shape[1])
+
+    first_os = next(iter(s_constants))
+    dim_extended_basis = int(s_constants[first_os].shape[0])
+    dim_basis          = int(s_constants[first_os].shape[1])
 
     commutant_matrix = ss.csc_matrix((dim_extended_basis, dim_basis), dtype=complex)
     
-    for ind_os in range(len(operator._basis)):
-        commutant_matrix += operator.coeffs[ind_os] * s_constants[ind_os]
+    for (coeff, os) in operator:
+        commutant_matrix += coeff * s_constants[os]
         
     return commutant_matrix
 
@@ -92,7 +93,7 @@ def _orthogonalize_cdagc(CDagC, basis, orth_ops):
 
         proj_ops += orth_vec.dot(orth_vec.H)
         
-    large_number = 1e12
+    large_number = 1e10
     new_CDagC += large_number * proj_ops
 
     return new_CDagC.real
@@ -113,19 +114,24 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
     explored_extended_basis += unexplored_extended_basis
 
     # Update the explored structure constants data.
-    for ind_os in range(len(H)):
+    for (coeff, os) in H:
         # The new information found from exploring.
-        row_inds_unexplored = [explored_extended_basis.index(unexplored_extended_basis.op_strings[ind_eb_os]) for ind_eb_os in unexplored_s_constants_data[ind_os][0]]
-        col_inds_unexplored = [explored_basis.index(unexplored_basis.op_strings[ind_b_os]) for ind_b_os in unexplored_s_constants_data[ind_os][1]]
-        data_unexplored     = unexplored_s_constants_data[ind_os][2]
+        row_inds_unexplored = [explored_extended_basis.index(unexplored_extended_basis.op_strings[ind_eb_os]) for ind_eb_os in unexplored_s_constants_data[os][0]]
+        col_inds_unexplored = [explored_basis.index(unexplored_basis.op_strings[ind_b_os]) for ind_b_os in unexplored_s_constants_data[os][1]]
+        data_unexplored     = unexplored_s_constants_data[os][2]
 
         # The old information from previous exploration.
-        old_row_inds = explored_s_constants_data[ind_os][0]
-        old_col_inds = explored_s_constants_data[ind_os][1]
-        old_data     = explored_s_constants_data[ind_os][2]
-
+        if os in explored_s_constants_data:
+            old_row_inds = explored_s_constants_data[os][0]
+            old_col_inds = explored_s_constants_data[os][1]
+            old_data     = explored_s_constants_data[os][2]
+        else:
+            old_row_inds = []
+            old_col_inds = []
+            old_data     = []
+            
         # The update
-        explored_s_constants_data[ind_os] = (old_row_inds + row_inds_unexplored, old_col_inds + col_inds_unexplored, old_data + data_unexplored)
+        explored_s_constants_data[os] = (old_row_inds + row_inds_unexplored, old_col_inds + col_inds_unexplored, old_data + data_unexplored)
     
     # From the collected information, find the
     # extended_basis corresponding to basis.
@@ -136,14 +142,14 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
     
     extended_basis = Basis()
     inds_extended_basis_to_x = []
-    for ind_os in range(len(H)):
+    for (coeff, os) in H:
         # If only considering a part of the Hamiltonian,
         # with OperatorStrings with the given allowed_labels, then
         # only construct the extended basis for that part.
-        if allowed_labels is not None and len(set(H._basis[ind_os].orbital_labels).intersection(allowed_labels)) == 0:
+        if allowed_labels is not None and len(set(os.orbital_labels).intersection(allowed_labels)) == 0:
             continue # TODO: check if I am doing this right
         
-        (inds_x_eb, inds_x_b, _) = explored_s_constants_data[ind_os]
+        (inds_x_eb, inds_x_b, _) = explored_s_constants_data[os]
         for (ind_x_eb, ind_x_b) in zip(inds_x_eb, inds_x_b):
             if ind_x_b in inds_x_to_basis and explored_extended_basis[ind_x_eb] not in extended_basis:
                 extended_basis += explored_extended_basis[ind_x_eb]
@@ -151,12 +157,12 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
     inds_x_to_extended_basis = dict()
     for ind_eb in range(len(extended_basis)):
         inds_x_to_extended_basis[inds_extended_basis_to_x[ind_eb]] = ind_eb 
-        
+
     # From the information collected from the
     # explored bases, construct the s_constants
     # that correspond to basis and extended basis.
-    s_constants = []
-    for ind_os in range(len(H)):
+    s_constants = dict()
+    for (coeff, os) in H:
         row_inds = []
         col_inds = []
         data     = []
@@ -164,8 +170,8 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
         # If only considering a part of the Hamiltonian,
         # with OperatorStrings with the given allowed_labels, then
         # only construct the extended basis for that part.
-        if allowed_labels is None or len(set(H._basis[ind_os].orbital_labels).intersection(allowed_labels)) != 0:
-            (inds_explored_eb, inds_explored_b, explored_data) = explored_s_constants_data[ind_os]
+        if allowed_labels is None or len(set(os.orbital_labels).intersection(allowed_labels)) != 0:
+            (inds_explored_eb, inds_explored_b, explored_data) = explored_s_constants_data[os]
             
             for (ind_explored_eb, ind_explored_b, explored_datum) in zip(inds_explored_eb, inds_explored_b, explored_data):
                 if ind_explored_b in inds_x_to_basis and ind_explored_eb in inds_x_to_extended_basis:
@@ -175,8 +181,8 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
                     col_inds.append(col_ind)
                     data.append(explored_datum)
                 
-        s_constants.append(ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(extended_basis), len(basis)), dtype=complex))
-    
+        s_constants[os] = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(extended_basis), len(basis)), dtype=complex)    
+
     return (s_constants, extended_basis)
 
 # TODO: document
@@ -236,7 +242,7 @@ def selected_ci(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=1
     if explored_data is None:
         explored_basis = Basis()
         explored_extended_basis = Basis()
-        explored_s_constants_data = [([],[],[])]*len(H)
+        explored_s_constants_data = dict()
     else:
         (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
     
@@ -329,7 +335,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
     if explored_data is None:
         explored_basis = Basis()
         explored_extended_basis = Basis()
-        explored_s_constants_data = [([],[],[])]*len(H)
+        explored_s_constants_data = dict()
     else:
         (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
     
@@ -528,7 +534,7 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
     if explored_data is None:
         explored_basis = Basis()
         explored_extended_basis = Basis()
-        explored_s_constants_data = [([],[],[])]*len(H)
+        explored_s_constants_data = dict()
     else:
         (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
     
@@ -631,7 +637,15 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
 # TODO: document, test
 # Idea: Expand the basis by commuting with the largest terms in H
 # and anticommuting with the largest terms in O.
-def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None):
+def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None):
+
+    if isinstance(com_ops, Operator):
+        H = com_ops
+        com_ops = [H]
+    elif isinstance(com_ops, list) and isinstance(com_ops[0], Operator):
+        H = com_ops[0]
+    else:
+        raise ValueError('Invalid com_ops of type: {}'.format(type(com_ops)))
 
     H_labels = np.array([label for os in H._basis for (_, label) in os], dtype=int)
     max_label = np.max(H_labels)
@@ -643,9 +657,9 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
     # Keep track of how OperatorStrings
     # commute with H during the calculation.
     if explored_data is None:
-        explored_basis = Basis()
-        explored_extended_basis = Basis()
-        explored_s_constants_data = [([],[],[])]*len(H)
+        explored_basis            = Basis()
+        explored_extended_basis   = Basis()
+        explored_s_constants_data = dict()
     else:
         (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
 
@@ -683,26 +697,27 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
         inds_largest_termsA = inds_largest_termsA[0:num_lterms]
         A_basis1 = Basis([extended_basis1[ind] for ind in inds_largest_termsA])
 
-        (s_constants2, extended_basis2) = _explore(A_basis1, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+        for com_op in com_ops:
+            (s_constants2, extended_basis2) = _explore(A_basis1, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
         
-        com_matrix2 = _com_matrix(s_constants2, H)
+            com_matrix2 = _com_matrix(s_constants2, com_op)
         
-        com_H_A = com_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
-        #print('com_H_A = {}'.format(com_H_A))
+            com_H_A = com_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
+            #print('com_H_A = {}'.format(com_H_A))
         
-        num_lterms = np.minimum(len(com_H_A), num_H_terms)
-        inds_largest_termsB = np.argsort(np.abs(com_H_A))[::-1]
-        #inds_largest_termsB = inds_largest_termsB[0:num_lterms]
+            num_lterms = np.minimum(len(com_H_A), num_H_terms)
+            inds_largest_termsB = np.argsort(np.abs(com_H_A))[::-1]
+            #inds_largest_termsB = inds_largest_termsB[0:num_lterms]
         
-        # Insert B into the basis
-        num_terms_added = 0
-        for ind in inds_largest_termsB:
-            os = extended_basis2[ind]
-            if os not in basis:
-                basis += os
-                num_terms_added += 1
-            if num_terms_added >= num_lterms:
-                break
+            # Insert B into the basis
+            num_terms_added = 0
+            for ind in inds_largest_termsB:
+                os = extended_basis2[ind]
+                if os not in basis:
+                    basis += os
+                    num_terms_added += 1
+                if num_terms_added >= num_lterms:
+                    break
             
         #basis += Basis([extended_basis2[ind] for ind in inds_largest_termsB])
         #basis += extended_basis2
@@ -786,8 +801,15 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
         previous_basis = copy.deepcopy(basis)
             
         # Find best operator in basis
-        (s_constants, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
-        CDagC = _cdagc(s_constants, H).real
+        CDagC   = ss.csr_matrix((len(basis), len(basis)), dtype=float)
+        CDagC_H = ss.csr_matrix((len(basis), len(basis)), dtype=float)
+        for ind_com_op in range(len(com_ops)):
+            com_op = com_ops[ind_com_op]
+            (s_constants, _) = _explore(basis, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
+            cdagc_real = _cdagc(s_constants, com_op).real
+            CDagC += cdagc_real
+            if ind_com_op == 0:
+                CDagC_H += cdagc_real
 
         # Orthogonalize against the given operators.
         if orth_ops is not None:
@@ -797,8 +819,19 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
             (evals, evecs) = nla.eigh(CDagC.toarray())
         else:
             maxiter = 10*int(CDagC.shape[0])*maxiter_scale
-            (evals, evecs) = ssla.eigsh(CDagC, k=2, sigma=-1e-6, which='LM', maxiter=maxiter, tol=tol)
-            
+            (evals, evecs) = ssla.eigsh(CDagC, k=1, sigma=-1e-8, which='LM', maxiter=maxiter, tol=tol)
+
+            inds_sort = np.argsort(np.abs(evals))
+            evals = evals[inds_sort]
+            evecs = evecs[:, inds_sort]
+
+        # Recompute the commutator norms for just
+        # commuting with the Hamiltonian.
+        if len(com_ops) > 1 or orth_ops is not None:
+            for ind_vec in range(int(evecs.shape[1])):
+                vec = ss.csr_matrix(evecs[:, ind_vec].reshape((len(basis), 1)), dtype=complex)
+                evals[ind_vec] = (vec.H).dot(CDagC_H.dot(vec))[0,0].real
+
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
             evecs = evecs[:, inds_sort]
@@ -828,13 +861,21 @@ def selected_ci_greedy(initial_operator, H, num_steps, num_H_terms=10, num_O_ter
 # TODO: document, test
 # Idea: Try to iteratively find many operators that commute with H.
 def selected_ci_greedy_many_ops(initial_operators, H, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True):
-    
+
+    if not (isinstance(max_basis_size, list) or isinstance(max_basis_size, np.ndarray)):
+        max_basis_sizes = max_basis_size * np.ones(num_steps, dtype=int)
+    else:
+        max_basis_sizes = np.copy(max_basis_size)
+
+    if not (isinstance(num_H_terms, list) or isinstance(num_H_terms, np.ndarray)):
+        num_H_terms = num_H_terms * np.ones(num_steps, dtype=int)
+        
     # Keep track of how OperatorStrings
     # commute with H during the calculation.
     if explored_data is None:
-        explored_basis = Basis()
-        explored_extended_basis = Basis()
-        explored_s_constants_data = [([],[],[])]*len(H)
+        explored_basis            = Basis()
+        explored_extended_basis   = Basis()
+        explored_s_constants_data = dict()
     else:
         (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
 
@@ -859,14 +900,19 @@ def selected_ci_greedy_many_ops(initial_operators, H, num_steps, num_H_terms=10,
                 
             current_op = current_operators[ind_op]
 
-            # TODO: truncate the operator.
+            # Truncate the operator.
+            if step > 0:
+                current_op = _truncate_operator(current_op, threshold=threshold, max_basis_size=max_basis_size)
+
+            com_ops = H
+            #com_ops = [H] + [current_operators[ind_op2] for ind_op2 in range(num_operators) if ind_op2 != ind_op]
             
-            (_, _, ops, c_norms) = selected_ci_greedy(current_op, H, 1, num_H_terms=num_H_terms, num_O_terms=num_O_terms, threshold=threshold, max_basis_size=max_basis_size, explored_data=explored_data, maxiter_scale=maxiter_scale, tol=tol, verbose=verbose, orth_ops=orth_ops)
+            (_, _, ops, c_norms) = selected_ci_greedy(current_op, com_ops, 1, num_H_terms=num_H_terms[step], num_O_terms=num_O_terms, threshold=threshold, max_basis_size=max_basis_sizes[step], explored_data=explored_data, maxiter_scale=maxiter_scale, tol=tol, verbose=verbose, orth_ops=orth_ops)
 
             current_operators[ind_op] = copy.deepcopy(ops[-1])
             
-            step_operators.append(ops[0])
-            step_com_norms.append(c_norms[0])
+            step_operators.append(ops[-1])
+            step_com_norms.append(c_norms[-1])
         
         result_operators.append(step_operators)
         result_com_norms.append(step_com_norms)

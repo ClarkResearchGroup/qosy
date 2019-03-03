@@ -493,7 +493,7 @@ class Operator:
 
         # Create a new operator with copies of the old
         # operators' information.
-        new_operator = Operator(np.copy(self.coeffs), copy.deepcopy(self._basis.op_strings))
+        new_operator = Operator(np.copy(self.coeffs), copy.deepcopy(self._basis.op_strings), op_type=self.op_type)
 
         # Enlarge the basis.
         new_operator._basis += other._basis

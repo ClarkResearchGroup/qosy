@@ -19,7 +19,7 @@ def test_explore_simple():
     # Initially, nothing has been explored.
     explored_basis            = qy.Basis()
     explored_extended_basis   = qy.Basis()
-    explored_s_constants_data = [([],[],[])]*len(H)
+    explored_s_constants_data = dict()
 
     # First exploration starting from basis
     (s_constants, extended_basis) = qy.algorithms._explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
@@ -29,10 +29,10 @@ def test_explore_simple():
     assert(set(extended_basis.op_strings) == set(explored_extended_basis.op_strings))
 
     # and the structure constants should agree.
-    for ind_os in range(len(s_constants)):
-        mat1 = s_constants[ind_os].toarray()
+    for (coeff, os) in H:
+        mat1 = s_constants[os].toarray()
 
-        (row_inds, col_inds, data) = explored_s_constants_data[ind_os]
+        (row_inds, col_inds, data) = explored_s_constants_data[os]
         mat2 = ss.csr_matrix((data, (row_inds,col_inds)), shape=(len(extended_basis), len(basis)), dtype=complex).toarray()
 
         assert(np.allclose(mat1, mat2))
@@ -55,9 +55,9 @@ def test_explore_simple():
     # *Note that the extended bases can be permutations of one another.*
     inds_1to3 = np.array([extended_basis3.index(os1) for os1 in extended_basis], dtype=int)
     
-    for ind_os in range(len(s_constants3)):
-        mat1 = s_constants[ind_os].toarray()
-        mat3 = s_constants3[ind_os].toarray()
+    for (coeff, os) in H:
+        mat1 = s_constants[os].toarray()
+        mat3 = s_constants3[os].toarray()
         mat3 = mat3[inds_1to3, :]
 
         assert(np.allclose(mat1, mat3))
@@ -85,7 +85,7 @@ def test_explore_hard():
     # Initially, nothing has been explored.
     explored_basis            = qy.Basis()
     explored_extended_basis   = qy.Basis()
-    explored_s_constants_data = [([],[],[])]*len(H)
+    explored_s_constants_data = dict()
 
     # Explore a few times to gather structure constants data
     num_explorations = 3
@@ -107,8 +107,8 @@ def test_explore_hard():
 
     assert(set(extended_basis1.op_strings) == set(extended_basis2.op_strings))
     
-    for ind_os in range(len(H)):
-        mat1 = s_constants1[ind_os].toarray()
-        mat2 = s_constants2[ind_os].toarray()
+    for (coeff, os) in H:
+        mat1 = s_constants1[os].toarray()
+        mat2 = s_constants2[os].toarray()
         mat2 = mat2[inds_1to2, :]
         assert(np.allclose(mat1, mat2))
