@@ -14,6 +14,8 @@ from .tools import sort_sign, gram_schmidt
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
 
+from .config import *
+
 def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', tol=1e-12):
     """Performs a binary operation between two OperatorStrings h_a and h_b.
     
@@ -23,11 +25,7 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
     """
     
     op_type = op_string_A.op_type
-    if op_type == 'Pauli':
-        (op1,op2,op3) = ('X', 'Y', 'Z')
-    elif op_type == 'Majorana':
-        (op1,op2,op3) = ('A', 'B', 'D')
-    else:
+    if not (op_type == 'Pauli' or op_type == 'Majorana'):
         raise NotImplementedError('Unsupported commutator between operator strings of type: {}'.format(op_type))
 
     if operation_mode == 'product' \
@@ -60,14 +58,14 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
     
     num_non_trivial_differences = 0
     for label in possible_labels_C:
-        try:
+        if label in op_string_A._indices_orbital_labels:
             indA = op_string_A._indices_orbital_labels[label]
-        except KeyError:
+        else:
             indA = -1
 
-        try:
+        if label in op_string_B._indices_orbital_labels:
             indB = op_string_B._indices_orbital_labels[label]
-        except KeyError:
+        else:
             indB = -1
                 
         if indA != -1 and indB == -1:
@@ -83,25 +81,10 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
             if opA != opB:
                 num_non_trivial_differences += 1
                 labelsC.append(label)
-                
-                if opA == op1 and opB == op2:
-                    coeff *= 1.0j
-                    opsC.append(op3)
-                elif opA == op2 and opB == op1:
-                    coeff *= -1.0j
-                    opsC.append(op3)
-                elif opA == op1 and opB == op3:
-                    coeff *= -1.0j
-                    opsC.append(op2)
-                elif opA == op3 and opB == op1:
-                    coeff *= 1.0j
-                    opsC.append(op2)
-                elif opA == op2 and opB == op3:
-                    coeff *= 1.0j
-                    opsC.append(op1)
-                elif opA == op3 and opB == op2:
-                    coeff *= -1.0j
-                    opsC.append(op1)
+
+                (const, opC) = PRODUCT_DICT[(opA,opB)]
+                coeff *= const
+                opsC.append(opC)
 
     if op_type == 'Pauli':
         # If an odd number of Pauli matrix pairs need to be multiplied, then the
@@ -111,7 +94,6 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
         # Otherwise, they are real and cancel.
         else:
             coeff = 0.0
-            
             
     elif op_type == 'Majorana':
         coeff1 *= coeff

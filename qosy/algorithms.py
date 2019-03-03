@@ -49,14 +49,17 @@ def _com_matrix(s_constants, operator):
     # commutant matrix of operator O,
     # from the structure constants and O.
 
-    first_os = next(iter(s_constants))
-    dim_extended_basis = int(s_constants[first_os].shape[0])
-    dim_basis          = int(s_constants[first_os].shape[1])
-
-    commutant_matrix = ss.csc_matrix((dim_extended_basis, dim_basis), dtype=complex)
-    
+    row_inds = []
+    col_inds = []
+    data     = []
     for (coeff, os) in operator:
-        commutant_matrix += coeff * s_constants[os]
+        (ext_basis_inds, basis_inds, s_data) = s_constants[os]
+        for (row_ind, col_ind, datum) in zip(ext_basis_inds, basis_inds, s_data):
+            row_inds.append(row_ind)
+            col_inds.append(col_ind)
+            data.append(coeff*datum)
+
+    commutant_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex)
         
     return commutant_matrix
 
@@ -79,7 +82,7 @@ def _orthogonalize_cdagc(CDagC, basis, orth_ops):
     
     # Create a projection matrix that projects
     # out of the space spanned by the given operators.
-    proj_ops = ss.csr_matrix((len(basis),len(basis)), dtype=complex)
+    proj_ops = ss.csc_matrix((len(basis),len(basis)), dtype=complex)
     for orth_op in orth_ops:
         row_inds = []
         col_inds = []
@@ -89,7 +92,7 @@ def _orthogonalize_cdagc(CDagC, basis, orth_ops):
                 data.append(coeff)
                 row_inds.append(basis.index(os))
                 col_inds.append(0)
-        orth_vec = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
+        orth_vec = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
 
         proj_ops += orth_vec.dot(orth_vec.H)
         
@@ -159,14 +162,11 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
         inds_x_to_extended_basis[inds_extended_basis_to_x[ind_eb]] = ind_eb 
 
     # From the information collected from the
-    # explored bases, construct the s_constants
-    # that correspond to basis and extended basis.
-    s_constants = dict()
+    # explored bases, construct the commutant matrix.
+    row_inds = []
+    col_inds = []
+    data     = []
     for (coeff, os) in H:
-        row_inds = []
-        col_inds = []
-        data     = []
-
         # If only considering a part of the Hamiltonian,
         # with OperatorStrings with the given allowed_labels, then
         # only construct the extended basis for that part.
@@ -177,13 +177,14 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
                 if ind_explored_b in inds_x_to_basis and ind_explored_eb in inds_x_to_extended_basis:
                     row_ind = inds_x_to_extended_basis[ind_explored_eb]
                     col_ind = inds_x_to_basis[ind_explored_b]
+                    
                     row_inds.append(row_ind)
                     col_inds.append(col_ind)
-                    data.append(explored_datum)
+                    data.append(coeff * explored_datum)
                 
-        s_constants[os] = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(extended_basis), len(basis)), dtype=complex)    
+    com_matrix = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(extended_basis), len(basis)), dtype=complex)
 
-    return (s_constants, extended_basis)
+    return (com_matrix, extended_basis)
 
 # TODO: document
 def selected_ci_simple(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=100):
@@ -426,7 +427,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
             if orth_ops is not None:
                 # Create a projection matrix that projects
                 # out of the space spanned by the given operators.
-                proj_ops = ss.csr_matrix((len(basis),len(basis)), dtype=complex)
+                proj_ops = ss.csc_matrix((len(basis),len(basis)), dtype=complex)
                 for orth_op in orth_ops:
                     row_inds = []
                     col_inds = []
@@ -436,7 +437,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
                             data.append(coeff)
                             row_inds.append(basis.index(os))
                             col_inds.append(0)
-                    orth_vec = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
+                    orth_vec = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
 
                     proj_ops += orth_vec.dot(orth_vec.H)
 
@@ -452,8 +453,8 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
 
                 #print('basis_norms = {}'.format(basis_norms))
 
-                D_sqrt     = ss.diags(np.sqrt(basis_norms), format='csr')
-                D_inv_sqrt = ss.diags(1.0 / np.sqrt(basis_norms), format='csr')
+                D_sqrt     = ss.diags(np.sqrt(basis_norms), format='csc')
+                D_inv_sqrt = ss.diags(1.0 / np.sqrt(basis_norms), format='csc')
                 
                 CDagC = D_inv_sqrt.dot(CDagC.dot(D_inv_sqrt))
                 CDagC = CDagC.real
@@ -489,7 +490,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
                 for ind_vec in range(int(evecs.shape[1])):
                     evecs[:,ind_vec] /= nla.norm(evecs[:,ind_vec])
 
-                    vector = ss.csr_matrix(evecs[:,ind_vec].reshape(len(basis),1))
+                    vector = ss.csc_matrix(evecs[:,ind_vec].reshape(len(basis),1))
                     evals[ind_vec] = np.real((vector.H).dot(CDagC).dot(vector)[0,0])
                 #print('Rescaled eigenvalues: {}'.format(evals))
                 
@@ -561,7 +562,7 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
         (s_constants1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
 
         com_matrix1    = _com_matrix(s_constants1, H)
-        com_H_operator = com_matrix1.dot(ss.csr_matrix(operator.coeffs).T)
+        com_H_operator = com_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
 
         # largest term of [H,O] is A; A -> largest term B in [H,A]
         inds_largest_termsA = np.argsort(np.abs(com_H_operator.toarray().flatten()))[::-1]
@@ -572,7 +573,7 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
 
             com_matrix2 = _com_matrix(s_constants2, H)
 
-            #A = ss.csr_matrix(([1.0], ([0], [0])), shape=(1,1), dtype=complex)
+            #A = ss.csc_matrix(([1.0], ([0], [0])), shape=(1,1), dtype=complex)
             com_H_A = com_matrix2.toarray()[:,0]
             #print('com_H_A = {}'.format(com_H_A))
         
@@ -686,10 +687,10 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
 
         # ==== 1st step: [H,[H,O]] to generate new terms ====
         # O -> [H,O]
-        (s_constants1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+        (com_matrix1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
         
-        com_matrix1    = _com_matrix(s_constants1, H)
-        com_H_operator = com_matrix1.dot(ss.csr_matrix(operator.coeffs).T)
+        #com_matrix1    = _com_matrix(s_constants1, H)
+        com_H_operator = com_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
 
         # largest terms of [H,O] are A; A -> largest terms B in [H,A]
         inds_largest_termsA = np.argsort(np.abs(com_H_operator.toarray().flatten()))[::-1]
@@ -698,9 +699,9 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         A_basis1 = Basis([extended_basis1[ind] for ind in inds_largest_termsA])
 
         for com_op in com_ops:
-            (s_constants2, extended_basis2) = _explore(A_basis1, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
+            (com_matrix2, extended_basis2) = _explore(A_basis1, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
         
-            com_matrix2 = _com_matrix(s_constants2, com_op)
+            #com_matrix2 = _com_matrix(s_constants2, com_op)
         
             com_H_A = com_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
             #print('com_H_A = {}'.format(com_H_A))
@@ -801,12 +802,12 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         previous_basis = copy.deepcopy(basis)
             
         # Find best operator in basis
-        CDagC   = ss.csr_matrix((len(basis), len(basis)), dtype=float)
-        CDagC_H = ss.csr_matrix((len(basis), len(basis)), dtype=float)
+        CDagC   = ss.csc_matrix((len(basis), len(basis)), dtype=float)
+        CDagC_H = ss.csc_matrix((len(basis), len(basis)), dtype=float)
         for ind_com_op in range(len(com_ops)):
             com_op = com_ops[ind_com_op]
-            (s_constants, _) = _explore(basis, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
-            cdagc_real = _cdagc(s_constants, com_op).real
+            (com_matrix, _) = _explore(basis, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
+            cdagc_real = ((com_matrix.H).dot(com_matrix)).real
             CDagC += cdagc_real
             if ind_com_op == 0:
                 CDagC_H += cdagc_real
@@ -829,7 +830,7 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         # commuting with the Hamiltonian.
         if len(com_ops) > 1 or orth_ops is not None:
             for ind_vec in range(int(evecs.shape[1])):
-                vec = ss.csr_matrix(evecs[:, ind_vec].reshape((len(basis), 1)), dtype=complex)
+                vec = ss.csc_matrix(evecs[:, ind_vec].reshape((len(basis), 1)), dtype=complex)
                 evals[ind_vec] = (vec.H).dot(CDagC_H.dot(vec))[0,0].real
 
             inds_sort = np.argsort(np.abs(evals))
