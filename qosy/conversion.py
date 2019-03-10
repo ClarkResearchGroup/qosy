@@ -18,7 +18,75 @@ from .tools import sort_sign, compare
 from .config import *
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
+from .algebra import product
 
+# TODO: add support for permutations or alternative X,Y,Z orderings.
+def _jordan_wigner(op_string):
+    # Convert a Pauli string to a Majorana string or vice-versa
+    # using the Jordan-Wigner transformation: 
+    #  a_i = (\prod_{j=1}^{i-1} Z_j) X_i
+    #  b_i = (\prod_{j=1}^{i-1} Z_j) Y_i
+    #  d_i = Z_i
+    #  X_i = (\prod_{j=1}^{i-1} d_j) a_i
+    #  Y_i = (\prod_{j=1}^{i-1} d_j) b_i
+    #  Z_i = d_i
+
+    op_type = op_string.op_type
+
+    total_coeff = op_string.prefactor
+    
+    if op_type == 'Pauli':
+        result = OperatorString([], [], op_type='Majorana')
+        
+        num_orbitals = len(op_string.orbital_operators)
+        for ind_orb in range(num_orbitals):
+            orb_op    = op_string.orbital_operators[ind_orb]
+            orb_label = op_string.orbital_labels[ind_orb]
+
+            if orb_op == 'X':
+                jw_ops = ['D']*orb_label + ['A']
+                jw_labels = np.arange(orb_label+1)
+            elif orb_op == 'Y':
+                jw_ops = ['D']*orb_label + ['B']
+                jw_labels = np.arange(orb_label+1)
+            elif orb_op == 'Z':
+                jw_ops    = ['D']
+                jw_labels = [orb_label]
+            else:
+                raise ValueError('Invalid operator {} in OperatorString.'.format(orb_op))
+            
+            jw_string       = OperatorString(jw_ops, jw_labels, 'Majorana')
+            (coeff, result) = product(result, jw_string)
+            total_coeff *= coeff
+            
+    elif op_type == 'Majorana':
+        result = OperatorString([], [], op_type='Pauli')
+        
+        num_orbitals = len(op_string.orbital_operators)
+        for ind_orb in range(num_orbitals):
+            orb_op    = op_string.orbital_operators[ind_orb]
+            orb_label = op_string.orbital_labels[ind_orb]
+
+            if orb_op == 'A':
+                jw_ops = ['Z']*orb_label + ['X']
+                jw_labels = np.arange(orb_label+1)
+            elif orb_op == 'B':
+                jw_ops = ['Z']*orb_label + ['Y']
+                jw_labels = np.arange(orb_label+1)
+            elif orb_op == 'D':
+                jw_ops    = ['Z']
+                jw_labels = [orb_label]
+            else:
+                raise ValueError('Invalid operator {} in OperatorString.'.format(orb_op))
+            
+            jw_string       = OperatorString(jw_ops, jw_labels, 'Pauli')
+            (coeff, result) = product(result, jw_string)
+            total_coeff *= coeff
+    else:
+        raise ValueError('Cannot perform Jordan-Wigner transformation on OperatorString of op_type: {}'.format(op_type))
+
+    return (total_coeff, result)
+    
 def _fermion_string_from_cdag_c_labels(prefactor, c_dag_labels, c_labels):
     # Construct a fermion string operator from the labels of the creation and
     # anhillation (c^\dagger and c) operators.
@@ -247,6 +315,28 @@ def _convert_operator_string(op_string, to_op_type, include_identity=False):
         return _convert_majorana_string(op_string, include_identity)
     elif op_string.op_type == 'Fermion' and to_op_type == 'Majorana':
         return _convert_fermion_string(op_string, include_identity)
+    elif op_string.op_type == 'Majorana' and to_op_type == 'Pauli':
+        (coeff, pauli_os) =  _jordan_wigner(op_string)
+        return Operator(np.array([coeff]), [pauli_os], 'Pauli')
+    elif op_string.op_type == 'Pauli' and to_op_type == 'Majorana':
+        (coeff, maj_os) =  _jordan_wigner(op_string)
+        return Operator(np.array([coeff]), [maj_os], 'Majorana')
+    elif op_string.op_type == 'Fermion' and to_op_type == 'Pauli':
+        maj_op = _convert_fermion_string(op_string, include_identity)
+
+        pauli_coeffs     = []
+        pauli_op_strings = []
+        for (maj_coeff, maj_os) in maj_op:
+            (pauli_coeff, pauli_os) = _jordan_wigner(maj_os)
+            pauli_coeffs.append(pauli_coeff*maj_coeff)
+            pauli_op_strings.append(pauli_os)
+        pauli_op = Operator(np.array(pauli_coeffs), pauli_op_strings, op_type='Pauli')
+        
+        return pauli_op
+    elif op_string.op_type == 'Pauli' and to_op_type == 'Fermion':
+        (coeff, maj_os) = _jordan_wigner(op_string)
+        ferm_op = _convert_majorana_string(maj_os, include_identity)
+        return coeff*ferm_op
     else:
         raise NotImplementedError('Unsupported conversion of OperatorString of op_type {} to {}'.format(op_string.op_type, to_op_type))
 
@@ -277,9 +367,7 @@ def convert(operator, to_op_type, include_identity=False):
     operator : Operator or OperatorString
         The Operator or OperatorString to convert.
     to_op_type : str
-        The type of operator to convert to. Currently, 
-        only conversion between 'Fermion' and 'Majorana' 
-        OperatorStrings are supported.
+        The type of operator to convert to.
     include_identity : bool, optional
         Specifies whether to include the identity OperatorString
         in the output Operator. By default, the identity
@@ -310,6 +398,9 @@ def convert(operator, to_op_type, include_identity=False):
     with support on many orbitals. In such
     circumstances, the `convert` method should be 
     avoided.
+
+    Fermionic operator strings are converted to Pauli strings
+    (and vice-versa) using the standard Jordan-Wigner transformation.
     """
     
     if isinstance(operator, OperatorString):

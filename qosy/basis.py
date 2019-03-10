@@ -391,15 +391,21 @@ class Operator:
         float
             The Hilbert-Schmidt norm of the Operator.
 
+        Notes
+        -----
+        Fermion strings do not form an orthonormal basis, so one 
+        would need to compute an overlap matrix to compute the 
+        correct normalization, which this method does not do. 
+        For fermion strings, this norm is only reliable for 
+        checking if an operator is zero, or for rescaling the
+        operator's coefficients.
+
         Examples
         --------
         >>> operator = qosy.Operator([1.0, 1.0], [qosy.opstring('X 1'), qosy.opstring('Y 1')])
         >>> operator.norm()          # sqrt(2) = 1.414213
         >>> operator.norm(order=numpy.inf) # 1.0
         """
-
-        if len(self._basis) > 0 and self._basis[0].op_type == 'Fermion':
-            warnings.warn('Computing the normalization of Operators made of Fermion strings is not supported yet. Fermion strings do not form an orthonormal basis, so one would need to compute an overlap matrix. The norm is only reliable for zero operators.')
         
         return np.linalg.norm(self.coeffs, ord=order)
 

@@ -919,3 +919,156 @@ def selected_ci_greedy_many_ops(initial_operators, H, num_steps, num_H_terms=10,
         result_com_norms.append(step_com_norms)
         
     return (result_operators, result_com_norms)
+
+
+# TODO: document, test
+# Idea: Expand the basis by commuting with the largest terms in H
+# and anticommuting with the largest terms in O.
+def selected_ci_greedy_many_ops2(initial_operators, H, num_steps, num_H_terms=10, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None):
+
+    num_ops = len(initial_operators)
+
+    if not (isinstance(num_H_terms, list) or isinstance(num_H_terms, np.ndarray)):
+        num_H_terms = num_H_terms * np.ones(num_steps, dtype=int)
+
+    H_labels = np.array([label for os in H._basis for (_, label) in os], dtype=int)
+    max_label = np.max(H_labels)
+
+    # The indices that sort the terms in the Hamiltonian
+    # by the magnitude of their coefficient.
+    inds_sorted = np.argsort(np.abs(H.coeffs))[::-1]
+    
+    # Keep track of how OperatorStrings
+    # commute with H during the calculation.
+    if explored_data is None:
+        explored_basis            = Basis()
+        explored_extended_basis   = Basis()
+        explored_s_constants_data = dict()
+    else:
+        (explored_basis, explored_extended_basis, explored_s_constants_data) = explored_data
+
+    basis = Basis()
+    for op in initial_operators:
+        basis += op._basis
+
+    # The current operators found at the most recent
+    # step of Selected CI.
+    current_operators = []
+    for op in initial_operators:
+        new_coeffs = np.zeros(len(basis), dtype=complex)
+        for (coeff, os) in op:
+            new_coeffs[basis.index(os)] = coeff
+        new_op = Operator(new_coeffs, basis.op_strings)
+        current_operators.append(new_op)
+    
+    # Keep a record of the smallest commutator norms
+    # observed during the iterations of Selected CI.
+    operators = []
+    com_norms = []
+
+    previous_previous_basis = None
+    previous_basis = copy.deepcopy(basis)
+    for step in range(num_steps):
+        new_os_to_add = Basis()
+        for ind_op in range(num_ops):
+            operator = current_operators[ind_op]
+            #operator_vector = (operator.coeffs).reshape((len(basis),1))
+            
+            # ==== Use [H,[H,O]] to generate new terms ====
+            # O -> [H,O]
+            (com_matrix1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+            
+            com_H_operator = com_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
+
+            # largest terms of [H,O] are A; A -> largest terms B in [H,A]
+            inds_largest_termsA = np.argsort(np.abs(com_H_operator.toarray().flatten()))[::-1]
+            num_lterms = np.minimum(len(inds_largest_termsA), num_H_terms[step])
+            inds_largest_termsA = inds_largest_termsA[0:num_lterms]
+            A_basis1 = Basis([extended_basis1[ind] for ind in inds_largest_termsA])
+
+            (com_matrix2, extended_basis2) = _explore(A_basis1, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+        
+            com_H_A = com_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
+        
+            num_lterms = np.minimum(len(com_H_A), num_H_terms[step])
+            inds_largest_termsB = np.argsort(np.abs(com_H_A))[::-1]
+            
+            # Insert B into the basis
+            num_terms_added = 0
+            for ind in inds_largest_termsB:
+                os = extended_basis2[ind]
+                if os not in basis and os not in new_os_to_add:
+                    new_os_to_add += os
+                    num_terms_added += 1
+                if num_terms_added >= num_lterms:
+                    break
+        basis += new_os_to_add
+        
+        if verbose:
+            print('Step {}: Basis = {}'.format(step, len(basis)))
+            
+        # Skip CDagC calculation if the algorithm has converged to a basis.
+        if step > 0 and set(basis.op_strings) == set(previous_basis.op_strings):
+            break
+        # Also if it gets into a cycle of switching between two bases.
+        elif step > 0 and previous_previous_basis is not None and set(basis.op_strings) == set(previous_previous_basis.op_strings):
+            break
+        
+        previous_previous_basis = copy.deepcopy(previous_basis)
+        previous_basis = copy.deepcopy(basis)
+        
+        # Find best operators in basis
+        (com_matrix, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+        CDagC = ((com_matrix.H).dot(com_matrix)).real
+            
+        # Orthogonalize against the given operators.
+        if orth_ops is not None:
+            CDagC = _orthogonalize_cdagc(CDagC, basis, orth_ops)
+            
+        if len(basis) < 20 and num_ops < 20:
+            (evals, evecs) = nla.eigh(CDagC.toarray())
+        else:
+            maxiter = 10*int(CDagC.shape[0])*maxiter_scale
+            (evals, evecs) = ssla.eigsh(CDagC, k=num_ops, sigma=-1e-8, which='LM', maxiter=maxiter, tol=tol)
+            
+            inds_sort = np.argsort(np.abs(evals))
+            evals = evals[inds_sort]
+            evecs = evecs[:, inds_sort]
+
+        # Recompute the commutator norms for just
+        # commuting with the Hamiltonian.
+        if orth_ops is not None:
+            for ind_vec in range(int(evecs.shape[1])):
+                vec = ss.csc_matrix(evecs[:, ind_vec].reshape((len(basis), 1)), dtype=complex)
+                evals[ind_vec] = (vec.H).dot(CDagC.dot(vec))[0,0].real
+                
+            inds_sort = np.argsort(np.abs(evals))
+            evals = evals[inds_sort]
+            evecs = evecs[:, inds_sort]
+            
+        vector   = evecs[:,0]
+        com_norm = evals[0]
+        
+        best_operators = [Operator(evecs[:,ind_vec], basis.op_strings) for ind_vec in range(num_ops)]
+        best_com_norms = evals[0:num_ops]
+        
+        operators.append(best_operators)
+        com_norms.append(best_com_norms)
+        
+        # Truncate basis
+        random_sum_vec = np.zeros(len(basis))
+        for ind_vec in range(num_ops):
+            random_sum_vec += (2.0*np.random.rand()-1.0) * evecs[:,ind_vec]
+        random_sum_vec /= nla.norm(random_sum_vec)    
+        basis = _truncate_basis(basis, random_sum_vec, threshold=threshold, max_basis_size=max_basis_size)
+        if verbose:
+            print('  Truncated basis: {}'.format(len(basis)))
+
+        # Truncate the operator into the new basis
+        current_operators = []
+        for ind_vec in range(num_ops):
+            new_coeffs = [evecs[basis.index(os),ind_vec] for os in basis]
+            new_op     = Operator(new_coeffs, basis.op_strings)
+            current_operators.append(new_op)
+        
+    return (operators, com_norms)

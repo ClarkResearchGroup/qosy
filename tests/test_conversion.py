@@ -1,6 +1,7 @@
 from .context import qosy as qy
 from .helper import _random_op_string
 import numpy as np
+import numpy.linalg as nla
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
 
@@ -130,50 +131,80 @@ def test_majorana_to_fermion_conversion():
     
     assert(np.allclose((expected_fermion_operator - fermion_operator).coeffs, 0.0))
 
+def test_pauli_to_majorana_conversion():
+    # Test some examples by hand
+
+    # Check identities: a_0 = X_0, b_0 = Y_0, D_0 = Z_0
+    majorana_operator          = qy.convert(qy.opstring('X 0'), 'Majorana')
+    expected_majorana_operator = qy.Operator([1.0], [qy.opstring('A 0')])
+
+    assert((expected_majorana_operator - majorana_operator).norm() < 1e-16)
+
+    majorana_operator          = qy.convert(qy.opstring('Y 0'), 'Majorana')
+    expected_majorana_operator = qy.Operator([1.0], [qy.opstring('B 0')])
+    
+    assert((expected_majorana_operator - majorana_operator).norm() < 1e-16)
+
+    majorana_operator          = qy.convert(qy.opstring('Z 0'), 'Majorana')
+    expected_majorana_operator = qy.Operator([1.0], [qy.opstring('D 0')])
+    
+    assert((expected_majorana_operator - majorana_operator).norm() < 1e-16)
+
+    # Check a two-site example: i a_0 b_1 = i (X_0)(Z_0 Y_1) = Y_0 Y_1
+    majorana_operator          = qy.convert(qy.opstring('Y 0 Y 1'), 'Majorana')
+    expected_majorana_operator = qy.Operator([1.0], [qy.opstring('A 0 B 1')])
+    
+    assert((expected_majorana_operator - majorana_operator).norm() < 1e-16)
+
+def test_majorana_to_pauli_conversion():
+    # Test some examples by hand
+
+    # Check identities: a_0 = X_0, b_0 = Y_0, D_0 = Z_0
+    pauli_operator          = qy.convert(qy.opstring('A 0'), 'Pauli')
+    expected_pauli_operator = qy.Operator([1.0], [qy.opstring('X 0')])
+
+    assert((expected_pauli_operator - pauli_operator).norm() < 1e-16)
+
+    pauli_operator          = qy.convert(qy.opstring('B 0'), 'Pauli')
+    expected_pauli_operator = qy.Operator([1.0], [qy.opstring('Y 0')])
+    
+    assert((expected_pauli_operator - pauli_operator).norm() < 1e-16)
+
+    pauli_operator          = qy.convert(qy.opstring('D 0'), 'Pauli')
+    expected_pauli_operator = qy.Operator([1.0], [qy.opstring('Z 0')])
+    
+    assert((expected_pauli_operator - pauli_operator).norm() < 1e-16)
+
+    # Check a two-site example: i a_0 b_1 = i (X_0)(Z_0 Y_1) = Y_0 Y_1
+    pauli_operator          = qy.convert(qy.opstring('A 0 B 1'), 'Pauli')
+    expected_pauli_operator = qy.Operator([1.0], [qy.opstring('Y 0 Y 1')])
+    
+    assert((expected_pauli_operator - pauli_operator).norm() < 1e-16)
+    
+    
 def test_conversions_are_consistent():
-    # Create random Fermion strings, convert them to Majorana strings,
-    # and convert them back to Fermion strings. You should always get
-    # what you started with.
-    num_trials = 50
+    # Create random operator strings, convert them to other operator strings,
+    # and convert them back. You should always get what you started with.
+    num_trials = 10
     
     max_num_orbitals        = 4
     possible_orbital_labels = np.arange(max_num_orbitals)
 
+    op_types = ['Pauli', 'Majorana', 'Fermion']
+    
     np.random.seed(42)
     for ind_trial in range(num_trials):
-        # Create a random Fermion string, put it into an Operator.
-        fermion_string1   = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Fermion')
-        fermion_operator1 = qy.Operator(np.array([1.0]), [fermion_string1])
+        for op_type1 in op_types:
+            # Create a random operator string, put it into an Operator.
+            os1 = _random_op_string(max_num_orbitals, possible_orbital_labels, op_type1)
+            op1 = qy.Operator([1.0], [os1])
+            for op_type2 in op_types:
+                # Convert from op_type1 to op_type2 and back.
+                op2 = qy.convert(op1, op_type2)
+                op3 = qy.convert(op2, op_type1)
 
-        # Convert the Fermion operator to a Majorana operator.
-        majorana_operator = qy.convert(fermion_operator1, 'Majorana')
-        # Convert the Majorana operator to a Fermion operator.
-        fermion_operator2 = qy.convert(majorana_operator, 'Fermion')
-
-        # Check that you get the original operator before conversion.
-        assert(np.allclose((fermion_operator1 - fermion_operator2).coeffs, 0.0))
-    
-    # Create random Majorana strings, convert them to Fermion strings,
-    # and convert them back to Majorana strings. You should always get
-    # what you started with.
-    num_trials = 50
-    
-    max_num_orbitals        = 4
-    possible_orbital_labels = np.arange(max_num_orbitals)
-
-    np.random.seed(42)
-    for ind_trial in range(num_trials):
-        # Create a random Majorana string, put it into an Operator.
-        majorana_string1   = _random_op_string(max_num_orbitals, possible_orbital_labels, 'Majorana')
-        majorana_operator1 = qy.Operator(np.array([1.0]), [majorana_string1])
-
-        # Convert the Majorana operator to a Fermion operator.
-        fermion_operator   = qy.convert(majorana_operator1, 'Fermion')
-        # Convert the Fermion operator to a Majorana operator.
-        majorana_operator2 = qy.convert(fermion_operator, 'Majorana')
-
-        # Check that you get the original operator before conversion.
-        assert((majorana_operator1 - majorana_operator2).norm() < 1e-12)
+                # Check that you get the original operator before conversion.
+                assert((op1 - op3).norm() < 1e-16)
 
 def test_conversion_matrix():
     # Use complete cluster bases of 4^n-1 Majorana
@@ -183,14 +214,14 @@ def test_conversion_matrix():
     basisA = qy.cluster_basis(2, [1,2], 'Majorana')
     basisB = qy.cluster_basis(2, [1,2], 'Fermion')
     
-    B = qy.conversion_matrix(basisA, basisB)
+    B = qy.conversion_matrix(basisA, basisB).toarray()
 
     # Check that the conversion matrix is invertible.
-    Binv = ssla.inv(B)
-    assert(ssla.norm(B*Binv - ss.eye(len(basisA), dtype=complex, format='csc')) < 1e-12)
-    assert(ssla.norm(Binv*B - ss.eye(len(basisA), dtype=complex, format='csc')) < 1e-12)
+    Binv = nla.inv(B)
+    assert(nla.norm(np.dot(B,Binv) - np.eye(len(basisA), dtype=complex)) < 1e-16)
+    assert(nla.norm(np.dot(Binv,B) - np.eye(len(basisA), dtype=complex)) < 1e-16)
 
     # Check that running the conversion in the other
     # direction reproduces the inverse matrix.
-    Binv2 = qy.conversion_matrix(basisB, basisA)
-    assert(ssla.norm(Binv - Binv2) < 1e-12)
+    Binv2 = qy.conversion_matrix(basisB, basisA).toarray()
+    assert(nla.norm(Binv - Binv2) < 1e-16)
