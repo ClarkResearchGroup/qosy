@@ -459,6 +459,23 @@ def plot_opstring(op_string, lattice, distance_cutoff=None, weight=1.0, marker_s
                 plt.plot([pos1[0], pos2[0]], [pos1[1], pos2[1]], 'r-', linewidth=max_width*np.abs(weight), alpha=0.5*np.abs(weight))
         else:
             positions = [lattice._orbitals[orb_label][0] for (orb_op, orb_label) in op_string]
+            num_pos = len(positions)
+
+            # Order the points by angles from a reference point.
+            reference_pos = np.mean(np.array(positions), axis=0) + 1e-12*(2.0*np.random.rand(2)-1.0)
+            angles = np.zeros(num_pos)
+            shifted_positions = [positions[ind]-reference_pos for ind in range(num_pos)]
+            n1 = shifted_positions[0] / nla.norm(shifted_positions[0])
+            for ind_pos in range(num_pos):
+                vec2 = shifted_positions[ind_pos]
+                n2   = vec2 / nla.norm(vec2)
+
+                cos_angle = np.dot(n1, n2)
+                sin_angle = n1[0]*n2[1] - n1[1]*n2[0]
+                
+                angles[ind_pos] = np.arctan2(sin_angle, cos_angle)
+            inds_sort = np.argsort(angles)
+            positions = [positions[ind] for ind in inds_sort]
 
             xs = [pos[0] for pos in positions]
             ys = [pos[1] for pos in positions]
@@ -470,7 +487,7 @@ def plot_opstring(op_string, lattice, distance_cutoff=None, weight=1.0, marker_s
                 if max_distance > distance_cutoff:
                     return
 
-            # Plot many-orbital operators as polygons.
+            # Plot many-orbital operators as polygons.            
             if weight > 0:
                 plt.fill(xs, ys, color='b', alpha=0.5*np.abs(weight))
             else:
