@@ -10,6 +10,7 @@ non-interacting fermionic Hamiltonians.
 """
 
 import numpy as np
+import numpy.linalg as nla
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
 
@@ -17,7 +18,7 @@ from .operatorstring import OperatorString
 from .basis import Basis, Operator
 from .conversion import convert
 
-def _apply_opstring(op_string, conf):
+def _apply_opstring(op_string, conf, num_orbitals):
     # Helper function to "_to_matrix_opstring"
     # that takes a spin configuration (represented
     # as an integer) and returns the new spin
@@ -30,12 +31,11 @@ def _apply_opstring(op_string, conf):
     
     new_conf  = conf
     new_coeff = op_string.prefactor # Should be 1 for Pauli strings
-    for (operator, label) in zip(op_string.orbital_operators, op_string.orbital_labels):
-        mask = (1 << label)
+    for (operator, label) in op_string:
+        mask = (1 << (num_orbitals-1-label))
         if operator == 'X':
             # Flip the bit at the site
             new_conf = new_conf ^ mask
-            new_coeff *= 1.0
         elif operator == 'Y':
             # Check whether the bit corresponding to site is 1
             if new_conf & mask != 0:
@@ -47,13 +47,11 @@ def _apply_opstring(op_string, conf):
         elif operator == 'Z':
             # Check whether the bit corresponding to site is 1
             if new_conf & mask != 0:
-                new_coeff *= 1.0
-            else:
                 new_coeff *= -1.0
 
     return (new_coeff, new_conf)
 
-def _to_matrix_opstring(op_string, num_orbitals):
+def _to_matrix_opstring(op_string, num_orbitals, return_tuple=False):
     # Converts an OperatorString to a sparse matrix.
     if op_string.op_type == 'Pauli':
         row_inds = []
@@ -61,35 +59,44 @@ def _to_matrix_opstring(op_string, num_orbitals):
         data     = []
         
         for conf in range(2**num_orbitals):
-            (coeff, new_conf) = _apply_opstring(op_string, conf)
+            (coeff, new_conf) = _apply_opstring(op_string, conf, num_orbitals)
 
-            row_inds.append(conf)
-            col_inds.append(new_conf)
+            row_inds.append(new_conf)
+            col_inds.append(conf)
             data.append(coeff)
 
-        return ss.csc_matrix((data, (row_inds, col_inds)), shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
+        if return_tuple:
+            return (row_inds, col_inds, data)
+        else:
+            return ss.csc_matrix((data, (row_inds, col_inds)), shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
     else:
         raise NotImplementedError('Not finished yet.')
 
-# TODO: document, test
+# TODO: document
 def to_matrix(operator, num_orbitals):
     if isinstance(operator, OperatorString):
         return _to_matrix_opstring(operator, num_orbitals)
     elif isinstance(operator, Operator):
-        result = ss.csc_matrix(shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
-        for (coeff, op_string) in operator:
-            result += coeff * _to_matrix_opstring(op_string)
-
-        result.sum_duplicates()
-        result.eliminate_zeros()
+        row_inds = []
+        col_inds = []
+        data     = []
         
+        for (coeff, op_string) in operator:
+            (os_row_inds, os_col_inds, os_data) =_to_matrix_opstring(op_string, num_orbitals, return_tuple=True)
+            
+            new_os_data = [coeff * datum for datum in os_data]
+            row_inds += os_row_inds
+            col_inds += os_col_inds
+            data     += new_os_data
+            
+        result = ss.csc_matrix((data, (row_inds, col_inds)), shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
         return result
     else:
         raise ValueError('Cannot convert an operator of type {} to a matrix.'.format(type(operator)))    
 
 # TODO: document, test
 def to_vector(matrix, basis, num_orbitals):
-    basis_matrices = [to_matrix(op_string, num_orbitals) for op_string in basis]
+    basis_matrices = [_to_matrix_opstring(op_string, num_orbitals) for op_string in basis]
     
     overlaps = np.array([(matrix.H).dot(mat).trace() for mat in basis_matrices], dtype=complex)
     
@@ -104,19 +111,23 @@ def to_operator(matrix, basis, num_orbitals):
     return op
 
 # TODO: document, test
-def diagonalize(operator, num_orbitals, mode='Hermitian', num_vectors=None):
+def diagonalize(operator, num_orbitals, mode='Hermitian', num_vecs=None):
     matrix = to_matrix(operator, num_orbitals)
 
     if mode == 'Hermitian':
-        if num_vectors is None:
+        if num_vecs is None:
             (evals, evecs) = nla.eigh(matrix.toarray())
         else:
-            (evals, evecs) = ssla.eigsh(matrix, k=num_vectors)
+            (evals, evecs) = ssla.eigsh(matrix, k=num_vecs, which='SA')
+
+        inds_sort = np.argsort(evals)
+        evals = evals[inds_sort]
+        evecs = evecs[:, inds_sort]
     else:
-        if num_vectors is None:
+        if num_vecs is None:
             (evals, evecs) = nla.eig(matrix.toarray())
         else:
-            (evals, evecs) = ssla.eigs(matrix, k=num_vectors)
+            (evals, evecs) = ssla.eigs(matrix, k=num_vecs)
     
     return (evals, evecs)
     
