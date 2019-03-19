@@ -16,6 +16,7 @@ import scipy.sparse.linalg as ssla
 
 from .operatorstring import OperatorString
 from .basis import Basis, Operator
+from .transformation import Transformation
 from .conversion import convert
 
 def _apply_opstring(op_string, conf, num_orbitals):
@@ -110,6 +111,31 @@ def to_operator(matrix, basis, num_orbitals):
 
     return op
 
+# TODO: document, test
+# Note: only for spin-1/2 vectors. Not taking into account
+# signs due to reordering fermionic operators.
+def apply_transformation(transformation, vector, num_orbitals):
+    permutation = transformation.info
+    if not (permutation is not None and len(permutation) == num_orbitals):
+        raise ValueError('Transformation is not a valid permutation. Only permutations supported.')
+    
+    permutation = np.array(permutation, dtype=int)
+    
+    new_vector = np.zeros(2**num_orbitals, dtype=complex)
+    
+    for conf in range(2**num_orbitals):
+        new_conf = 0
+        for label in range(num_orbitals):
+            new_label = permutation[label]
+            mask_old_label = (1 << (num_orbitals-1-label))
+            mask_new_label = (1 << (num_orbitals-1-new_label))
+            
+            new_conf += (conf & mask_old_label != 0) * mask_new_label
+            
+        new_vector[new_conf] = vector[conf]
+    
+    return new_vector
+            
 # TODO: document, test
 def diagonalize(operator, num_orbitals, mode='Hermitian', num_vecs=None):
     matrix = to_matrix(operator, num_orbitals)

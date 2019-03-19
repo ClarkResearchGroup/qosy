@@ -110,9 +110,12 @@ def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
     labels = op_string.orbital_labels
 
     # The identity operator.
-    if len(ops) == 0 and include_identity:
-        return Operator(np.array([1.0]), [OperatorString([], [], 'Fermion')])
-    
+    if len(ops) == 0:
+        if include_identity:
+            return Operator(np.array([1.0]), [OperatorString([], [], 'Fermion')])
+        else:
+            return Operator([], [], 'Fermion')
+        
     # Used to make sure that the fermion labels end up normal ordered.
     # I add this large number to the anhillation operators c_i labels
     # so that they end up last in the list of operators sorted by labels.

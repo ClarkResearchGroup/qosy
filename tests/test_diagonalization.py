@@ -79,7 +79,35 @@ def test_to_matrix():
     
     assert(np.allclose(matrix_op, expected_matrix_op))
 
-def test_diagonalize():
+def test_apply_transformation():
+    num_orbitals = 2
+    labels = np.arange(num_orbitals)
+    
+    permutation    = np.array([1,0], dtype=int)
+    transformation = qy.label_permutation(permutation)
+
+    # [00, 01, 10, 11] -> [00, 10, 01, 11]
+    vector     = np.array([0.1, 0.2j, -0.3, -0.4j], dtype=complex)
+    new_vector = qy.apply_transformation(transformation, vector, num_orbitals)
+
+    expected_new_vector = np.array([0.1, -0.3, 0.2j, -0.4j], dtype=complex)
+    assert(np.allclose(new_vector, expected_new_vector))
+    
+    num_orbitals = 3
+    labels = np.arange(num_orbitals)
+    
+    permutation    = np.array([1,2,0], dtype=int)
+    transformation = qy.label_permutation(permutation)
+
+    # [000, 001, 010, 011, 100, 101, 110, 111] = [0,1,2,3,4,5,6,7]
+    # -> [000, 010, 100, 110, 001, 011, 101, 111] = [0,2,4,6,1,3,5,7]
+    vector     = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], dtype=complex)
+    new_vector = qy.apply_transformation(transformation, vector, num_orbitals)
+
+    expected_new_vector = np.array([0.1,0.3,0.5,0.7,0.2,0.4,0.6,0.8], dtype=complex)
+    assert(np.allclose(new_vector, expected_new_vector))
+    
+def test_diagonalize_transverse_ising():
     L = 5
     lamb = 1.0
 
@@ -111,3 +139,47 @@ def test_diagonalize():
     expected_gs_energy = (1.0 - 1.0/np.sin(np.pi/(2.0*(2.0*L+1.0))))/L
     
     assert(np.isclose(gs_energy1, expected_gs_energy))
+
+def test_diagonalize_majumdar_ghosh():
+    L = 6
+    lamb = 1.0
+    
+    coeffs     = []
+    op_strings = []
+    for site in range(L):
+        for d_site in [1,2]:
+            sitep = (site + d_site) % L
+            s1 = np.minimum(site, sitep)
+            s2 = np.maximum(site, sitep)
+            for orb_op in ['X', 'Y', 'Z']:
+                if d_site == 1:
+                    coeffs.append(1.0*0.25)
+                else:
+                    coeffs.append(0.5*0.25)
+                op_strings.append(qy.opstring('{} {} {} {}'.format(orb_op, s1, orb_op, s2)))
+    
+    hamiltonian = qy.Operator(coeffs, op_strings)
+    
+    # Full diagonalization
+    (evals1, evecs1) = qy.diagonalize(hamiltonian, L)
+    # Lanczos
+    (evals2, evecs2) = qy.diagonalize(hamiltonian, L, num_vecs=3)
+    gs_energy1 = evals1[0] / L
+    gs_energy2 = evals2[0] / L
+    
+    assert(np.isclose(gs_energy1, gs_energy2))
+    
+    # Should be a doubly degenerate ground state
+    inds_gs1 = np.where(np.abs(evals1-evals1[0]) < 1e-14)[0]
+    inds_gs2 = np.where(np.abs(evals2-evals2[0]) < 1e-14)[0]
+    num_gs1 = len(inds_gs1)
+    num_gs2 = len(inds_gs2)
+
+    assert(num_gs1 == num_gs2)
+    assert(num_gs1 == 2)
+    
+    # Exact ground state energy per site
+    expected_gs_energy = -1.5*0.25
+    
+    assert(np.isclose(gs_energy1, expected_gs_energy))
+    
