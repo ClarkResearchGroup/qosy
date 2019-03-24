@@ -106,6 +106,66 @@ def test_apply_transformation():
 
     expected_new_vector = np.array([0.1,0.3,0.5,0.7,0.2,0.4,0.6,0.8], dtype=complex)
     assert(np.allclose(new_vector, expected_new_vector))
+
+def test_reduced_density_matrix():
+    # 00,01,10,11
+    # A = region (orbital labels) remaining after trace
+    # B = region to trace out
+    num_orbitals = 2
+    A = [0]
+    B = [1]
+    a = 1.0/np.sqrt(2.0)
+    b = 1j/np.sqrt(2.0)
+    vector_AB = np.array([a, 0, 0, b], dtype=complex)
+    
+    rho_A = qy.reduced_density_matrix(vector_AB, A, num_orbitals)
+    
+    expected_rho_A = np.array([[np.abs(a)**2, 0], [0, np.abs(b)**2]], dtype=complex)
+
+    assert(np.allclose(rho_A, expected_rho_A))
+
+    rho_B = qy.reduced_density_matrix(vector_AB, B, num_orbitals)
+    
+    expected_rho_B = np.array([[np.abs(a)**2, 0], [0, np.abs(b)**2]], dtype=complex)
+    
+    assert(np.allclose(rho_B, expected_rho_B))
+
+    # 000,001,010,011,100,101,110,111
+    num_orbitals = 3
+    A = [1,2]
+    B = [0]
+    a = 1.0/np.sqrt(3.0)
+    b = 1j/np.sqrt(3.0)
+    c = -1.0/np.sqrt(3.0)
+    vector_AB = np.array([a, 0, b, 0, 0, 0, 0, c], dtype=complex)
+    
+    rho_A = qy.reduced_density_matrix(vector_AB, A, num_orbitals)
+    
+    expected_rho_A      = np.zeros((4,4), dtype=complex)
+    expected_rho_A[0,0] = np.abs(a)**2
+    expected_rho_A[0,2] = a*np.conj(b)
+    expected_rho_A[2,0] = b*np.conj(a)
+    expected_rho_A[2,2] = np.abs(b)**2
+    expected_rho_A[3,3] = np.abs(c)**2
+    
+    assert(np.allclose(rho_A, expected_rho_A))
+
+def test_renyi_entropy():
+    num_orbitals = 2
+    rho = np.zeros((2**num_orbitals,2**num_orbitals), dtype=complex)
+    rho[0,0] = 1
+    
+    entropy = qy.renyi_entropy(rho)
+    expected_entropy = 0.0
+
+    assert(np.isclose(entropy, expected_entropy))
+
+    rho = np.diag(1.0/(2**num_orbitals)*np.ones(2**num_orbitals,dtype=complex))
+    
+    entropy = qy.renyi_entropy(rho)
+    expected_entropy = num_orbitals * np.log(2)
+
+    assert(np.isclose(entropy, expected_entropy))
     
 def test_diagonalize_transverse_ising():
     L = 5

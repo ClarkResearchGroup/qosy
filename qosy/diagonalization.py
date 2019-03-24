@@ -111,7 +111,7 @@ def to_operator(matrix, basis, num_orbitals):
 
     return op
 
-# TODO: document, test
+# TODO: document
 # Note: only for spin-1/2 vectors. Not taking into account
 # signs due to reordering fermionic operators.
 def apply_transformation(transformation, vector, num_orbitals):
@@ -135,8 +135,71 @@ def apply_transformation(transformation, vector, num_orbitals):
         new_vector[new_conf] = vector[conf]
     
     return new_vector
+
+def _reshape_vector_subsystems(vector, remaining_orbital_labels, num_orbitals):
+    traced_orbital_labels  = [label for label in range(num_orbitals) if label not in remaining_orbital_labels]
+    traced_num_orbitals    = len(traced_orbital_labels)
+    remaining_num_orbitals = len(remaining_orbital_labels)
+
+    # |psi> = \sum_{ab} c_{ab} |a>|b>
+    # rho   = \sum_{ab,a'b'} c^*_{ab} c_{a'b'} |a>|b><a'|<b'|
+    # rho_A = \tr_B(rho) = \sum_{aa',b} c^*_{ab} c_{a'b} |a><a'|
+    c_ab = np.zeros((2**remaining_num_orbitals, 2**traced_num_orbitals), dtype=complex)
+    
+    for conf in range(2**num_orbitals):
+        conf_a    = 0
+        new_label = 0
+        for label in remaining_orbital_labels:
+            mask_old_label = (1 << (num_orbitals-1-label))
+            mask_new_label = (1 << (remaining_num_orbitals-1-new_label))
             
-# TODO: document, test
+            conf_a += (conf & mask_old_label != 0) * mask_new_label
+
+            new_label += 1
+
+        conf_b    = 0
+        new_label = 0
+        for label in traced_orbital_labels:
+            mask_old_label = (1 << (num_orbitals-1-label))
+            mask_new_label = (1 << (traced_num_orbitals-1-new_label))
+
+            conf_b += (conf & mask_old_label != 0) * mask_new_label
+
+            new_label += 1
+            
+        c_ab[conf_a, conf_b] = vector[conf]
+
+    print('vec={}'.format(vector))
+    print('c_ab=\n{}'.format(c_ab))
+    return c_ab
+
+# TODO: document
+def reduced_density_matrix(vector, remaining_orbital_labels, num_orbitals):
+    if isinstance(vector, tuple):
+        vector1 = vector[0]
+        vector2 = vector[1]
+        
+        c_ab1  = _reshape_vector_subsystems(vector1, remaining_orbital_labels, num_orbitals)
+        c_ab2  = _reshape_vector_subsystems(vector2, remaining_orbital_labels, num_orbitals)
+        result = np.dot(c_ab1, np.conj(c_ab2.T))
+    elif isinstance(vector, np.ndarray):
+        c_ab   = _reshape_vector_subsystems(vector, remaining_orbital_labels, num_orbitals)
+        result = np.dot(c_ab, np.conj(c_ab.T))
+    else:
+        raise ValueError('Invalid input of type: {}'.format(type(vector)))
+    
+    return result
+    
+# TODO: document
+def renyi_entropy(rho, n=2):
+    num_orbitals = rho.shape[0]
+    rho_product  = ss.eye(num_orbitals, dtype=complex, format='csr')
+    for ind in range(n):
+        rho_product = rho_product.dot(rho)
+
+    return (1.0/(1.0-n)) * np.log(rho_product.trace())
+
+# TODO: document
 def diagonalize(operator, num_orbitals, mode='Hermitian', num_vecs=None):
     matrix = to_matrix(operator, num_orbitals)
 
