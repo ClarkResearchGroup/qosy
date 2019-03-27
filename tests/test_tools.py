@@ -119,6 +119,20 @@ def test_gram_schmidt():
 
     assert(np.allclose(vecs.toarray(), expected_vecs))
     
+    # Do a simple complex number check by hand.
+    matrix = np.array([[1.,  1.],\
+                       [1.j, 1.]])
+
+    vecs = qy.tools.gram_schmidt(matrix, tol=1e-12)
+    expected_vecs = 1./np.sqrt(2.)*np.array([[1.,  1.],\
+                                             [1j, -1j]])
+    
+    # First vector agrees
+    assert(np.allclose(vecs[:,0], expected_vecs[:,0]))
+    # Second vector agrees up to a phase.
+    overlap = np.vdot(vecs[:,1], expected_vecs[:,1])
+    assert(np.isclose(np.abs(overlap), 1.0))
+    
     n = 10
     m = 5
 

@@ -169,8 +169,6 @@ def _reshape_vector_subsystems(vector, remaining_orbital_labels, num_orbitals):
             
         c_ab[conf_a, conf_b] = vector[conf]
 
-    print('vec={}'.format(vector))
-    print('c_ab=\n{}'.format(c_ab))
     return c_ab
 
 # TODO: document
@@ -192,12 +190,12 @@ def reduced_density_matrix(vector, remaining_orbital_labels, num_orbitals):
     
 # TODO: document
 def renyi_entropy(rho, n=2):
-    num_orbitals = rho.shape[0]
-    rho_product  = ss.eye(num_orbitals, dtype=complex, format='csr')
+    num_states  = rho.shape[0]
+    rho_product = np.eye(num_states)
     for ind in range(n):
-        rho_product = rho_product.dot(rho)
+        rho_product = np.dot(rho_product, rho)
 
-    return (1.0/(1.0-n)) * np.log(rho_product.trace())
+    return (1.0/(1.0-n)) * np.real(np.log(np.trace(rho_product)))
 
 # TODO: document
 def diagonalize(operator, num_orbitals, mode='Hermitian', num_vecs=None):

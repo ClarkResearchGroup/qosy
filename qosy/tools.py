@@ -419,7 +419,7 @@ def gram_schmidt(matrix, tol=0.0):
         ind_col = ind_col_unshifted - shift
         new_matrix[:,ind_col] = matrix[:,ind_col_unshifted]
         for ind_vec in range(ind_col):
-            new_matrix[:,ind_col] -= _vdot(new_matrix[:,ind_col], new_matrix[:,ind_vec]) * new_matrix[:,ind_vec]
+            new_matrix[:,ind_col] -= _vdot(new_matrix[:,ind_vec], new_matrix[:,ind_col]) * new_matrix[:,ind_vec]
 
         norm = _norm(new_matrix[:,ind_col])
         
