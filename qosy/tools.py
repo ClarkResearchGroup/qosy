@@ -403,7 +403,7 @@ def gram_schmidt(matrix, tol=0.0):
         def _norm(vec):
             return nla.norm(vec)
         def _vdot(vec1, vec2):
-            return np.vdot(vec1, vec2)
+            return np.dot(np.conj(vec1), vec2)
     else:
         new_matrix = ss.lil_matrix(matrix.shape, dtype=complex)
         

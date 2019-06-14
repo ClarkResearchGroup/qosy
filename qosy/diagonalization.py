@@ -11,6 +11,7 @@ non-interacting fermionic Hamiltonians.
 
 import numpy as np
 import numpy.linalg as nla
+import scipy.linalg as sla
 import scipy.sparse as ss
 import scipy.sparse.linalg as ssla
 
@@ -99,7 +100,7 @@ def to_matrix(operator, num_orbitals):
 def to_vector(matrix, basis, num_orbitals):
     basis_matrices = [_to_matrix_opstring(op_string, num_orbitals) for op_string in basis]
     
-    overlaps = np.array([(matrix.H).dot(mat).trace() for mat in basis_matrices], dtype=complex)
+    overlaps = np.array([(matrix.H).dot(mat).diagonal().sum() for mat in basis_matrices], dtype=complex)
     
     return overlaps
     
@@ -199,7 +200,7 @@ def renyi_entropy(rho, n=2):
 
 # TODO: document
 def diagonalize(operator, num_orbitals, mode='Hermitian', num_vecs=None):
-    matrix = to_matrix(operator, num_orbitals)
+    matrix = to_matrix(convert(operator, 'Pauli'), num_orbitals)
 
     if mode == 'Hermitian':
         if num_vecs is None:
@@ -218,8 +219,8 @@ def diagonalize(operator, num_orbitals, mode='Hermitian', num_vecs=None):
     
     return (evals, evecs)
     
-# TODO: document, test
-def diagonalize_quadratic(operator):
+# TODO: document, test, finish
+def diagonalize_quadratic(operator, num_orbitals, lattice=None, threshold=1e-12):
 
     op = operator
     if operator.op_type == 'Fermion':
@@ -233,13 +234,15 @@ def diagonalize_quadratic(operator):
     row_inds = []
     col_inds = []
     for (coeff, op_string) in op:
+        sign = 1.0
         if len(op_string.orbital_operators) == 1 and op_string.orbital_operators[0] == 'D':
-            # d_j = i a_j b_j
+            # d_j = -i a_j b_j
             # My convention is that the index of a_j is 2j
             #                   and the index of b_j is 2j+1
             orb_label = op_string.orbital_labels[0]
             i = 2*orb_label
             j = 2*orb_label+1
+            sign *= -1.0
         elif len(op_string.orbital_operators) == 2 and op_string.orbital_operators[0] in ['A','B'] and op_string.orbital_operators[1] in ['A', 'B']:
             orb_label = op_string.orbital_labels[0]
             if op_string.orbital_operators[0] == 'A':
@@ -258,26 +261,54 @@ def diagonalize_quadratic(operator):
         # A_{ij}
         row_inds.append(i)
         col_inds.append(j)
-        data.append(0.5*coeff)
+        data.append(0.5*4.0*np.real(coeff)*sign)
 
         # A_{ji} = -A_{ij}
         row_inds.append(j)
         col_inds.append(i)
-        data.append(-0.5*coeff)
+        data.append(-0.5*4.0*np.real(coeff)*sign)
 
     # Number of orbitals (goes up to largest orbital encountered).
-    N = np.max(row_inds) // 2
+    N = num_orbitals
+    
+    A = ss.csr_matrix((data, (row_inds, col_inds)), shape=(2*N,2*N), dtype=float)
+    
+    # Fourier transform the orbitals if a lattice is provided
+    # and the lattice is periodic.
+    if lattice is not None:
+        # TODO: finish
+        momenta_dim = []
+        for ind_dim in range(lattice.dim):
+            if lattice.periodic_boundaries[ind_dim]:
+                L_dim = lattice.num_cells[ind_dim]
+                #momenta = 2.0*np.pi/L_dim * np.arange(L_dim)
 
-    A = ss.csc_matrix((data, (row_inds, col_inds)), shape=(2*N,2*N), dtype=float)
-    #matrix = ss.bmat([[None, A], [-A, None]]).toarray()
-    #(evals, evecs) = nla.eigh(matrix)
+                momenta_dim.append(momenta)
+            else:
+                momenta_dim.append(list())
+        
+        raise NotImplementedError('Fourier transformed lattice diagonalization is unsupported.')
 
-    # Calculate the 2x2 block (Schur) decomposition of A.
-    (T, Z) = ssla.schur(A.toarray(), output='real')
-
+    # Calculate the 2x2 block (Schur) decomposition of A = Z T Z^H,
+    # where Z is unitary and T is quasi-upper-triangular,
+    # so that it forms 2x2 blocks of the form [[0, a], [-a, 0]].
+    (T, Z) = sla.schur(A.toarray(), output='real')
+    
     # N (non-negative) eigenvalues
-    eigvals = np.array([T[2*n,2*n+1] for n in range(N)])
+    # Note: the +/- eigenvalue pairs across the diagonal are
+    # scrambled so that sometimes the positive one is on the
+    # upper diagonal and sometimes the negative one is there.
+    eigvals = np.array([T[2*n,2*n+1] for n in range(N)], dtype=float)
 
+    # Swap +/- eigenvectors so that the + one is on
+    # the upper diagonal.
+    for n in range(N):
+        if np.abs(eigvals[n]) > threshold and eigvals[n] < -threshold:
+            eigvals[n]  = T[2*n+1,2*n]
+            temp_column = np.copy(Z[:,2*n])
+            Z[:,2*n]    = Z[:,2*n+1]
+            Z[:,2*n+1]  = temp_column
+    
     # 2N x 2N, the Majorana operators are organized as
     # a_1, b_1, a_2, b_2, ...
     eigvecs_Majorana = Z
@@ -306,6 +337,6 @@ def diagonalize_quadratic(operator):
                                                   -1j*Z[2*m+1,2*n]    + Z[2*m+1,2*n+1])
             
     # The ground state energy
-    constant_shift = -2.0*np.sum(eigvals)
+    constant_shift = -0.5*np.sum(eigvals)
     
     return (constant_shift, eigvals, eigvecs_Fermion, eigvecs_Majorana)

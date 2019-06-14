@@ -6,6 +6,7 @@ space group symmetry, and a method for computing the effect
 of a Transformation on a Basis of OperatorStrings.
 """
 
+import warnings
 import numpy as np
 import numpy.linalg as nla
 import scipy.sparse as ss
@@ -83,7 +84,7 @@ class Transformation:
             result = Operator(op_type=operator.op_type)
             for (coeff, op_string) in operator:
                 if np.abs(np.imag(coeff)) > tol:
-                    raise NotImplementedError('Operators with complex coefficients are currently not supported with transformations (time-reversal might behave incorrectly).')
+                    warnings.warn('Operators with complex coefficients might behave incorrectly with transformations, such as time-reversal symmetry.')
                 
                 result += coeff * self.rule(op_string, self.info)
             return result

@@ -243,3 +243,117 @@ def test_diagonalize_majumdar_ghosh():
     
     assert(np.isclose(gs_energy1, expected_gs_energy))
     
+def test_diagonalize_kitaev_chain():
+    L  = 6
+    t  = 1.0
+    mu = -2.0
+    D  = 3.0
+    
+    coeffs     = []
+    op_strings = []
+    for site in range(L):
+        sitep = (site + 1) % L
+        (s1,s2) = (np.minimum(site,sitep), np.maximum(site,sitep))
+
+        op_strings.append(qy.opstring('CDag {} C {}'.format(s1, s2)))
+        coeffs.append(-t)
+                
+        op_strings.append(qy.opstring('CDag {} CDag {}'.format(s1, s2)))
+        if site < sitep:
+            coeffs.append(-D)
+        else:
+            coeffs.append(D)
+        
+        op_strings.append(qy.opstring('CDag {} C {}'.format(site, site)))
+        coeffs.append(-mu)
+        
+    hamiltonian = qy.Operator(coeffs, op_strings)
+    
+    # Full diagonalization
+    (evals1, evecs1) = qy.diagonalize(hamiltonian, L)
+    
+    # Quadratic diagonalization
+    (gs_energy, evals_onebody, evecs_onebody, _) = qy.diagonalize_quadratic(hamiltonian, L)
+    
+    k = 2.0*np.pi/L * np.arange(L)
+    expected_evals_onebody = np.sqrt((2.0*t*np.cos(k) + mu)**2.0 + 4.0*(D**2.0)*np.sin(k)**2.0)
+    
+    inds_fermi_energy  = np.where(expected_evals_onebody > 0.0)[0]
+    expected_gs_energy = -0.5*np.sum(expected_evals_onebody[inds_fermi_energy])
+
+    # ED and expected answer agree.
+    assert(np.isclose(evals1[0], expected_gs_energy))
+
+    # Expected one-body energies agree with quadratic diagonalization.
+    assert(np.allclose(np.sort(expected_evals_onebody), np.sort(evals_onebody)))
+    
+    # ED and quadratic diagonalization agree.
+    assert(np.isclose(evals1[0], gs_energy))
+
+def test_diagonalize_kitaev_chain_zero_modes():
+    L  = 6
+    t  = 1.0
+    mu = -0.25 # Topological phase: |\mu/t| < 1/2
+    D  = 1.0
+    
+    coeffs     = []
+    op_strings = []
+    for site in range(L):
+        op_strings.append(qy.opstring('CDag {} C {}'.format(site, site)))
+        coeffs.append(-mu)
+    
+    for site in range(L-1):
+        sitep = site + 1
+        (s1,s2) = (np.minimum(site,sitep), np.maximum(site,sitep))
+
+        op_strings.append(qy.opstring('CDag {} C {}'.format(s1, s2)))
+        coeffs.append(-t)
+                
+        op_strings.append(qy.opstring('CDag {} CDag {}'.format(s1, s2)))
+        coeffs.append(-D)
+        
+    hamiltonian = qy.Operator(coeffs, op_strings)
+    
+    # Full diagonalization
+    (evals1, evecs1) = qy.diagonalize(hamiltonian, L)
+    
+    # Quadratic diagonalization
+    (gs_energy, evals_onebody, evecs_onebody, _) = qy.diagonalize_quadratic(hamiltonian, L)
+    
+    # ED and quadratic diagonalization agree.
+    assert(np.isclose(evals1[0], gs_energy))
+
+    # Expect a zero energy mode:
+    inds_zero_modes = np.where(np.abs(evals_onebody) < 1e-5)[0]
+    num_zero_modes  = len(inds_zero_modes)
+
+    assert(num_zero_modes == 1)
+
+def test_tight_binding():
+    L = 6
+
+    coeffs     = []
+    op_strings = []
+    for x in range(L):
+        for y in range(L):
+            site = x*L + y
+            for (dx,dy) in [(1,0), (0,1)]:
+                sitep = ((x+dx)%L)*L + (y+dy)%L
+                (s1,s2) = (np.minimum(site,sitep), np.maximum(site,sitep))
+                
+                op_strings.append(qy.opstring('CDag {} C {}'.format(s1, s2)))
+                coeffs.append(-1.0)
+
+    hamiltonian = qy.Operator(coeffs, op_strings)
+
+    (gs_energy, evals_onebody, evecs_onebody, _) = qy.diagonalize_quadratic(hamiltonian, L*L)
+
+    k = 2.0*np.pi/L * np.arange(L)
+    (Kx,Ky) = np.meshgrid(k,k)
+    expected_evals_onebody = np.abs(-2.0*np.cos(Kx)-2.0*np.cos(Ky))
+    expected_evals_onebody = expected_evals_onebody.flatten()
+    
+    print(evals_onebody)
+    print(expected_evals_onebody)
+
+    assert(np.allclose(np.sort(expected_evals_onebody), np.sort(evals_onebody)))

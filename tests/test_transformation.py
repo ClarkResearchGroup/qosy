@@ -136,7 +136,15 @@ def test_spinful_time_reversal():
     expected_operator = qy.Operator([-1.0], [qy.opstring('A 0 D 3')])
 
     assert((operator - expected_operator).norm() < 1e-12)
+    
+    # d_{0,\downarrow} d_{1,\uparrow} -> (d_{0,\uparrow}) (d_{1,\downarrow})
+    op_string = qy.opstring('D 1 D 2')
+    operator  = T.apply(op_string)
 
+    expected_operator = qy.Operator([1.0], [qy.opstring('D 0 D 3')])
+
+    assert((operator - expected_operator).norm() < 1e-12)
+    
     #### THREE-ORBITAL TESTS
 
     # i a_{0,\downarrow} b_{1,\uparrow} d_{2,\downarrow}
@@ -146,6 +154,16 @@ def test_spinful_time_reversal():
     operator  = T.apply(op_string)
 
     expected_operator = qy.Operator([-1.0], [qy.opstring('1j A 0 B 3 D 4')])
+
+    assert((operator - expected_operator).norm() < 1e-12)
+    
+    # d_{0,\uparrow} a_{1,\downarrow} d_{2,\downarrow}
+    #   -> (d_{0,\downarrow}) (-a_{1,\uparrow}) (d_{2,\uparrow})
+    #   -> -d_{0,\downarrow} a_{1,\uparrow} d_{2,\uparrow}
+    op_string = qy.opstring('D 0 A 3 D 5')
+    operator  = T.apply(op_string)
+
+    expected_operator = qy.Operator([-1.0], [qy.opstring('D 1 A 2 D 4')])
 
     assert((operator - expected_operator).norm() < 1e-12)
     

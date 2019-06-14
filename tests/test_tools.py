@@ -136,17 +136,41 @@ def test_gram_schmidt():
     n = 10
     m = 5
 
-    # For random matrices, check that the
+    # For random real matrices, check that the
     # orthogonalized vectors still span
     # the same space.
     num_trials = 50
     np.random.seed(42)
     for ind_trial in range(num_trials):
-        random_matrix = np.random.rand(n,m)
+        random_matrix = 2.0*np.random.rand(n,m)-1.0
         vecs          = qy.tools.gram_schmidt(random_matrix)
-        
-        np.allclose(np.dot(np.conj(vecs).T, vecs), np.eye(m))
 
+        # Check that the vectors are orthonormal.
+        assert(np.allclose(np.dot(np.conj(vecs).T, vecs), np.eye(m)))
+
+        # Check that every column vector of random_matrix
+        # has non-zero overlap with the vectors of vecs.
+        overlaps = np.dot(np.conj(random_matrix).T, vecs)
+        all_rows_non_zero = True
+        for ind_row in range(m):
+            if np.allclose(overlaps[ind_row,:], 0.0):
+                all_rows_non_zero = False
+                break
+        
+        assert(all_rows_non_zero)
+
+    # For random complex matrices, check that the
+    # orthogonalized vectors still span
+    # the same space.
+    num_trials = 50
+    np.random.seed(42)
+    for ind_trial in range(num_trials):
+        random_matrix = (2.0*np.random.rand(n,m)-1.0) + 1j*(2.0*np.random.rand(n,m)-1.0)
+        vecs          = qy.tools.gram_schmidt(random_matrix)
+
+        # Check that the vectors are orthonormal.
+        assert(np.allclose(np.dot(np.conj(vecs).T, vecs), np.eye(m, dtype=complex)))
+        
         # Check that every column vector of random_matrix
         # has non-zero overlap with the vectors of vecs.
         overlaps = np.dot(np.conj(random_matrix).T, vecs)

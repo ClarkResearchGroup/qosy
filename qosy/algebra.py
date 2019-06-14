@@ -178,7 +178,7 @@ def product(op_A, op_B):
     elif isinstance(op_A, Operator) and isinstance(op_B, Operator):
         return _operation_operator(op_A, op_B, operation_mode='product')
     else:
-        raise ValueError()
+        raise ValueError('Cannot compute product of objects of types {} and {}'.format(type(op_A), type(op_B)))
     
 def commutator(op_A, op_B):
     """Compute the commutator of two OperatorStrings or Operators.
@@ -208,7 +208,7 @@ def commutator(op_A, op_B):
     elif isinstance(op_A, Operator) and isinstance(op_B, Operator):
         return _operation_operator(op_A, op_B, operation_mode='commutator')
     else:
-        raise ValueError()
+        raise ValueError('Cannot compute commutator of objects of types {} and {}'.format(type(op_A), type(op_B)))
 
 def anticommutator(op_A, op_B):
     """Compute the anticommutator of two OperatorStrings or Operators.
@@ -238,7 +238,7 @@ def anticommutator(op_A, op_B):
     elif isinstance(op_A, Operator) and isinstance(op_B, Operator):
         return _operation_operator(op_A, op_B, operation_mode='anticommutator')
     else:
-        raise ValueError()
+        raise ValueError('Cannot compute anticommutator of objects of types {} and {}'.format(type(op_A), type(op_B)))
     
 def structure_constants(basisA, basisB, operation_mode='commutator', return_extended_basis=False, return_data_tuple=False, tol=1e-16):
     """Compute the structure constants obtained by taking

@@ -275,9 +275,6 @@ class Operator:
         OperatorStrings :math:`\\hat{h}_a`. If all 
         coefficients are real, then the operator
         is Hermitian.
-    op_strings : list of OperatorStrings
-        The OperatorStrings :math:`\\hat{h}_a` that 
-        make up this operator.
     op_type : str
         The type of OperatorStrings that make up the 
         operator: 'Pauli', 'Majorana', or 'Fermion'.
