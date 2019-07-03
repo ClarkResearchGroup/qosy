@@ -87,7 +87,7 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_sup
         (evals, evecs) = nla.eigh(CDagC.toarray())
     else:
         # Use a small negative sigma for the shift-invert method.
-        sigma = -1e-2
+        sigma = -1e-6
         (evals, evecs) = ssla.eigsh(CDagC, k=num_vecs, sigma=sigma)
 
     inds_ns    = np.where(np.abs(evals) < tol)[0]
@@ -292,6 +292,11 @@ class SymmetricOperatorGenerator:
             that commute ('commutator') or anticommute 
             ('anticommutator') with the given symmetry.
             Defaults to 'commutator'.
+        num_vecs : int, optional
+            If not None, uses Lanczos and returns the lowest
+            `num_vecs` number of lowest eigenvalues instead
+            of performing full diagonalization. Defaults to
+            None.
 
         Notes
         -----

@@ -76,6 +76,8 @@ def relabel_orbitals(string, lattice):
             orbital_info += str(unit_cell_coords)+'; '
 
         # 2) The index of the atom in the unit cell.
+        # TODO: Change this to only show if there is
+        # more than one atom per unit cell.
         orbital_info += str(unit_cell_atom_index) #np.array2string(unit_cell_pos,precision=3) 
 
         # 3) Any extra orbital information (like "Up" or "Dn"

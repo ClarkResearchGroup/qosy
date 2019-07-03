@@ -340,3 +340,35 @@ def diagonalize_quadratic(operator, num_orbitals, lattice=None, threshold=1e-12)
     constant_shift = -0.5*np.sum(eigvals)
     
     return (constant_shift, eigvals, eigvecs_Fermion, eigvecs_Majorana)
+
+# TODO: document, test, finish
+def diagonalize_quadratic_tightbinding(operator, num_orbitals, num_vecs=None):
+    
+    op = convert(operator, 'Fermion')
+    
+    data = []
+    row_inds = []
+    col_inds = []
+
+    for (coeff, os) in op:
+        if len(os.orbital_operators) == 2 and os.orbital_operators[0] == 'CDag' and os.orbital_operators[1] == 'C':
+            orb1 = os.orbital_labels[0]
+            orb2 = os.orbital_labels[1]
+
+            data.append(coeff*os.prefactor)
+            row_inds.append(orb1)
+            col_inds.append(orb2)
+
+            data.append(np.conj(coeff*os.prefactor))
+            row_inds.append(orb2)
+            col_inds.append(orb1)
+        else:
+            raise ValueError('Invalid tight-binding term in operator: {}'.format(os))
+    tight_binding_hamiltonian = ss.csr_matrix((data, (row_inds, col_inds)), shape=(num_orbitals, num_orbitals), dtype=complex)
+
+    if num_vecs is None:
+        (evals, evecs) = nla.eigh(tight_binding_hamiltonian.toarray())
+    else:
+        (evals, evecs) = ssla.eigsh(tight_binding_hamiltonian, k=num_vecs, which='SA')
+    
+    return (evals, evecs)

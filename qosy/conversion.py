@@ -103,8 +103,8 @@ def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
     # Converts a Majorana string to an Operator
     # that is a linear combination of Fermion strings.
     
-    if op_string.op_type is not 'Majorana':
-        raise ValueError('Trying to convert a Majorana string to a Fermion string but given an OperatorString of type {}'.format(op_type))
+    if op_string.op_type != 'Majorana':
+        raise ValueError('Trying to convert a Majorana string to a Fermion string but given an OperatorString of type {}'.format(op_string.op_type))
     
     ops    = op_string.orbital_operators
     labels = op_string.orbital_labels
