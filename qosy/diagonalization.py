@@ -372,3 +372,71 @@ def diagonalize_quadratic_tightbinding(operator, num_orbitals, num_vecs=None):
         (evals, evecs) = ssla.eigsh(tight_binding_hamiltonian, k=num_vecs, which='SA')
     
     return (evals, evecs)
+
+# TODO: document, test, finish
+def diagonalize_bdg(operator, num_orbitals, sigma=None, num_vecs=None, threshold=1e-12):
+    N = num_orbitals
+    
+    op = operator
+    if operator.op_type == 'Majorana':
+        op = convert(operator, 'Fermion') 
+    elif operator.op_type != 'Fermion':
+        raise ValueError('Diagonalization of an Operator of type {} is not supported.'.format(operator.op_type))
+
+    # Some relevant notes: https://pdfs.semanticscholar.org/e366/2e895d071e31071f0a8ac9a620bd224e18df.pdf, https://arxiv.org/pdf/1711.00011.pdf
+    
+    data = []
+    row_inds = []
+    col_inds = []
+    for (coeff, op_string) in op:
+        if len(op_string.orbital_operators) != 2:
+            raise ValueError('Unsupported diagonalization. OperatorString in Operator is not quadratic:\n {}'.format(op_string))
+        elif op_string.orbital_operators[0] == 'CDag' and op_string.orbital_operators[1] == 'C':
+            i = op_string.orbital_labels[0]
+            j = op_string.orbital_labels[1]
+            
+            tij = coeff * op_string.prefactor
+
+            if i != j:
+                row_inds.extend([i,j,i+N,j+N])
+                col_inds.extend([j,i,j+N,i+N])
+                data.extend([tij, np.conj(tij), -np.conj(tij), -tij])
+            else:
+                row_inds.extend([i,i+N])
+                col_inds.extend([i,i+N])
+                data.extend([tij, -np.conj(tij)])
+        elif op_string.orbital_operators[0] == 'CDag' and op_string.orbital_operators[1] == 'CDag':
+            i = op_string.orbital_labels[0]
+            j = op_string.orbital_labels[1]
+            
+            Dij = coeff * op_string.prefactor
+            
+            if i != j:
+                row_inds.extend([  i,    j,           i+N,          j+N])
+                col_inds.extend([j+N,  i+N,             j,            i])
+                data.extend(    [Dij, -Dij, -np.conj(Dij), np.conj(Dij)])
+            else:
+                raise ValueError('Invalid operator string: {}'.format(op_string))
+        else:
+            raise ValueError('Unsupported diagonalization. OperatorString in Operator is not quadratic:\n {}'.format(op_string))
+    
+    H = ss.csr_matrix((data, (row_inds, col_inds)), shape=(2*N,2*N), dtype=complex)
+    
+    if num_vecs is None:
+        (evals, evecs) = nla.eigh(H.toarray())
+    else:
+        (evals, evecs) = ssla.eigsh(H, k=num_vecs, which='SA', sigma=sigma)
+        
+    inds_sort = np.argsort(evals)
+    evals = evals[inds_sort]
+    evecs = evecs[:, inds_sort]
+
+    U = evecs[:,0:N]
+    U = U[0:N,:]
+
+    V = evecs[:,0:N]
+    V = V[N:(2*N),:]
+
+    energies = np.abs(evals[0:N])
+
+    return (energies, U, V)

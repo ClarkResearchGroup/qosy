@@ -274,6 +274,9 @@ def test_diagonalize_kitaev_chain():
     
     # Quadratic diagonalization
     (gs_energy, evals_onebody, evecs_onebody, _) = qy.diagonalize_quadratic(hamiltonian, L)
+
+    # BdG diagonalization
+    (bdg_energies, _, _) = qy.diagonalize_bdg(hamiltonian, L)
     
     k = 2.0*np.pi/L * np.arange(L)
     expected_evals_onebody = np.sqrt((2.0*t*np.cos(k) + mu)**2.0 + 4.0*(D**2.0)*np.sin(k)**2.0)
@@ -286,6 +289,12 @@ def test_diagonalize_kitaev_chain():
 
     # Expected one-body energies agree with quadratic diagonalization.
     assert(np.allclose(np.sort(expected_evals_onebody), np.sort(evals_onebody)))
+
+    # BdG energies match expected energies.
+    print('check:')
+    print(np.sort(expected_evals_onebody))
+    print(np.sort(bdg_energies))
+    assert(np.allclose(np.sort(expected_evals_onebody), np.sort(bdg_energies)))
     
     # ED and quadratic diagonalization agree.
     assert(np.isclose(evals1[0], gs_energy))
@@ -319,16 +328,22 @@ def test_diagonalize_kitaev_chain_zero_modes():
     
     # Quadratic diagonalization
     (gs_energy, evals_onebody, evecs_onebody, _) = qy.diagonalize_quadratic(hamiltonian, L)
+
+    # BdG diagonalization
+    (bdg_energies, _, _) = qy.diagonalize_bdg(hamiltonian, L)
     
     # ED and quadratic diagonalization agree.
     assert(np.isclose(evals1[0], gs_energy))
+
+    # BdG one-body energies and the energies obtained from diagonalize_quadratic should agree:
+    assert(np.allclose(np.sort(evals_onebody), np.sort(bdg_energies)))
 
     # Expect a zero energy mode:
     inds_zero_modes = np.where(np.abs(evals_onebody) < 1e-5)[0]
     num_zero_modes  = len(inds_zero_modes)
 
     assert(num_zero_modes == 1)
-
+    
 def test_tight_binding():
     L = 6
 

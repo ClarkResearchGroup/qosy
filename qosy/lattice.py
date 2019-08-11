@@ -212,6 +212,23 @@ class Lattice:
             
         mirror_distances = [np.linalg.norm((pos1+bv)-pos2) for bv in self._boundary_vectors]
         return np.min(mirror_distances)
+
+    def position(self, orb_index):
+        """Compute the position of the orbital with the
+        given index.
+
+        Parameters
+        ----------
+        orb_index : int
+            The index of the orbital whose position
+            to find.
+
+        Returns
+        -------
+            The position of the orbital in the lattice.
+        """
+
+        return self._orbitals[orb_index][0]
     
     def __iter__(self):
         """Return an iterator over the positions, the names,
@@ -281,7 +298,7 @@ def cubic(d, num_cells, periodic_boundaries=None, orbital_names=None):
     Examples
     --------
     To create a 4x4x4 periodic 3D cubic lattice
-        >>> qosy.lattice.cubic(3, (4,4,4), periodic=(True,True,True))
+        >>> qosy.lattice.cubic(3, (4,4,4), periodic_boundaries=(True,True,True))
     """
 
     if periodic_boundaries is None:

@@ -219,7 +219,7 @@ def print_operators(operators, lattice=None, keywords=None, convert_to=None, nor
 
         ind_vec += 1
 
-def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seitz=True):
+def plot(lattice, with_labels=False, with_lattice_vectors=True, with_unit_cell=False, with_wigner_seitz=True):
     """Plot the lattice represented by the 
     Lattice object. Plots the unit cell that 
     tiles the lattice in a separate color.
@@ -235,6 +235,9 @@ def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seit
     with_lattice_vectors : bool, optional
         Specifies whether to plot the lattice 
         vectors. True by default. 
+    with_unit_cell : bool, optional
+        Specifies whether to highlight the
+        atoms in the unit cell. False by default.
     with_wigner_seitz : bool, optional
         Specifies whether to depict 
         the Wigner-Seitz unit cell boundary.
@@ -253,7 +256,8 @@ def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seit
             x_uc.append(position[0])
             y_uc.append(0.0)
 
-        plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
+        if with_unit_cell:
+            plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
 
         xs = []
         ys = []
@@ -292,8 +296,9 @@ def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seit
         for position in lattice.unit_cell.atom_positions:
             x_uc.append(position[0])
             y_uc.append(position[1])
-    
-        plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
+
+        if with_unit_cell:
+            plt.plot(x_uc, y_uc, 'rs', markeredgecolor='r', markersize=10, alpha=0.5)
                 
         xs = []
         ys = []
@@ -364,7 +369,8 @@ def plot(lattice, with_labels=False, with_lattice_vectors=True, with_wigner_seit
             y_uc.append(position[1])
             z_uc.append(position[2])
 
-        ax.scatter(x_uc, y_uc, z_uc, c='r', marker='s')
+        if with_unit_cell:
+            ax.scatter(x_uc, y_uc, z_uc, c='r', marker='s')
 
         xs = []
         ys = []

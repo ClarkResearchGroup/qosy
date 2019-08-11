@@ -435,7 +435,7 @@ class Operator:
         basis : Basis
             The Basis of OperatorStrings in which
             to represent the Operator as a vector.
-        fmt : str
+        fmt : str, optional
             The array format to return the vector
             as. Specifying 'numpy' returns a ndarray
             of shape (n,); 'csc' returns a scipy.sparse.csc_matrix

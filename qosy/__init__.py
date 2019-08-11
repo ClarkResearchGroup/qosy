@@ -12,7 +12,7 @@ from .algebra         import *
 from .transformation  import Transformation, symmetry_matrix, time_reversal, particle_hole, charge_conjugation, label_permutation, spin_flip_symmetry, space_group_symmetry, spin_parity_symmetry
 from .visualization   import relabel_orbitals, print_vectors, print_operators, plot, show, plot_opstring, plot_operator
 from .symmetrization  import symmetrize_basis, symmetrize_lattice
-from .diagonalization import to_matrix, to_vector, to_operator, apply_transformation, reduced_density_matrix, renyi_entropy, diagonalize, diagonalize_quadratic
+from .diagonalization import to_matrix, to_vector, to_operator, apply_transformation, reduced_density_matrix, renyi_entropy, diagonalize, diagonalize_quadratic, diagonalize_bdg
 
 # Loads additional operator string algorithms.
 from .algorithms import selected_ci
