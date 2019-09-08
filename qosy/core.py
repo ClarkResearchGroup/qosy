@@ -27,21 +27,21 @@ import scipy.sparse.linalg as ssla
 
 from .tools import intersection, gram_schmidt, sparsify
 from .basis import Basis, Operator
-from .algebra import commutant_matrix
+from .algebra import liouvillian_matrix
 from .transformation import Transformation, symmetry_matrix
 
 def commuting_operators(basis, operator, operation_mode='commutator', return_superoperator=False, num_vecs=None, tol=1e-10):
     """Find operators in the vector space spanned by the
-    OperatorStrings :math:`\\hat{h}_a` that commute (or 
+    OperatorStrings :math:`\\hat{\\mathcal{S}}_a` that commute (or 
     anti-commute) with the given Operator 
-    :math:`\\hat{\\mathcal{O}} = \\sum_{a} g_a \\hat{h}_a`.
+    :math:`\\hat{\\mathcal{O}} = \\sum_{a} g_a \\hat{\\mathcal{S}}_a`.
 
     These operators are null vectors of the commutant matrix.
 
     Parameters
     ----------
     basis : Basis or list of Operators
-        The Basis of OperatorStrings :math:`\\hat{h}_a` or list 
+        The Basis of OperatorStrings :math:`\\hat{\\mathcal{S}}_a` or list 
         of Operators :math:`\\hat{\\mathcal{O}}_a` to search in.
     operator : Operator
         The Operator :math:`\\hat{\\mathcal{O}}` to commute (or 
@@ -72,23 +72,23 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_sup
         whose columns are operators in the given Basis. In particular,
         the column vectors :math:`J^{(1)},\\ldots,J^{(M)}` are the 
         coefficients :math:`J_a^{(i)}` of operators 
-        :math:`\\hat{H}^{(i)}=\\sum_{a} J_a^{(i)} \\hat{h}_a` that commute 
+        :math:`\\hat{\\mathcal{S}}^{(i)}=\\sum_{a} J_a^{(i)} \\hat{\\mathcal{S}}_a` that commute 
         (or anti-commute) with the given Operator :math:`\\hat{\\mathcal{O}}`.
         If `return_superoperator` is True, returns a tuple of the null
-        vectors, the matrix :math:`C^\\dagger C`, its eigenvalues, and its eigenvectors
-        as sparse scipy matrices where :math:`C` is the commutant matrix.
+        vectors, the commutant matrix :math:`C`, its eigenvalues, and its eigenvectors
+        as sparse scipy matrices.
     """
     
-    com_matrix = commutant_matrix(basis, operator, operation_mode=operation_mode)
+    l_matrix = liouvillian_matrix(basis, operator, operation_mode=operation_mode)
 
-    CDagC = (com_matrix.H).dot(com_matrix)
+    com_matrix = (l_matrix.H).dot(l_matrix)
 
     if num_vecs is None:
-        (evals, evecs) = nla.eigh(CDagC.toarray())
+        (evals, evecs) = nla.eigh(com_matrix.toarray())
     else:
         # Use a small negative sigma for the shift-invert method.
         sigma = -1e-6
-        (evals, evecs) = ssla.eigsh(CDagC, k=num_vecs, sigma=sigma)
+        (evals, evecs) = ssla.eigsh(com_matrix, k=num_vecs, sigma=sigma)
 
     inds_ns    = np.where(np.abs(evals) < tol)[0]
     null_space = evecs[:,inds_ns]
@@ -97,13 +97,13 @@ def commuting_operators(basis, operator, operation_mode='commutator', return_sup
         warnings.warn('All {} vectors found with eigsh were in the null space. Increase num_vecs to ensure that you are not missing null vectors.'.format(num_vecs))
 
     if return_superoperator:
-        return (null_space, CDagC, evals, evecs)
+        return (null_space, com_matrix, evals, evecs)
     else:
         return null_space
 
 def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=None, return_superoperator=False, tol=1e-10):
     """Find operators in the vector space spanned by the
-    OperatorStrings :math:`\\hat{h}_a` that commute (or anti-commute)
+    OperatorStrings :math:`\\hat{\\mathcal{S}}_a` that commute (or anti-commute)
     with the Transformation :math:`\\hat{\\mathcal{U}}`.
 
     These operators are :math:`(\\pm 1)`-eigenvalue eigenvectors 
@@ -112,7 +112,7 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
     Parameters
     ----------
     basis : Basis or list of Operators
-        The Basis of OperatorStrings :math:`\\hat{h}_a` or list 
+        The Basis of OperatorStrings :math:`\\hat{\\mathcal{S}}_a` or list 
         of Operators :math:`\\hat{\\mathcal{O}}_a` to search in.
     transform : Transformation
         The Transformation :math:`\\hat{\\mathcal{U}}` to commute (or 
@@ -144,7 +144,7 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
         whose columns are operators in the given Basis. In particular,
         the column vectors :math:`J^{(1)},\\ldots,J^{(M)}` are the 
         coefficients :math:`J_a^{(i)}` of operators 
-        :math:`\\hat{H}^{(i)}=\\sum_{a} J_a^{(i)} \\hat{h}_a` that commute 
+        :math:`\\hat{H}^{(i)}=\\sum_{a} J_a^{(i)} \\hat{\\mathcal{S}}_a` that commute 
         (or anti-commute) with the given Transformation :math:`\\hat{\\mathcal{U}}`.
         If `return_superoperator` is True, returns a tuple of the null
         vectors, a modified symmetry matrix, its eigenvalues, and its eigenvectors

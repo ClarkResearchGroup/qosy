@@ -44,7 +44,7 @@ def _truncate_operator(operator, threshold=1e-6, max_basis_size=100, filter_fun=
     result = Operator(coeffs, truncated_basis.op_strings)
     return result
 
-def _com_matrix(s_constants, operator):
+def _l_matrix(s_constants, operator):
     # Computes C_O, where C_O is the
     # commutant matrix of operator O,
     # from the structure constants and O.
@@ -59,26 +59,26 @@ def _com_matrix(s_constants, operator):
             col_inds.append(col_ind)
             data.append(coeff*datum)
 
-    commutant_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex)
+    liouvillian_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex)
         
-    return commutant_matrix
+    return liouvillian_matrix
 
-def _cdagc(s_constants, operator):
+def _com_matrix(s_constants, operator):
     # Computes C_O^\dagger C_O, where C_O is the
     # commutant matrix of operator O,
     # from the structure constants and O.
 
-    commutant_matrix = _com_matrix(s_constants, operator)
-    CDagC = (commutant_matrix.H).dot(commutant_matrix)
+    liouvillian_matrix = _l_matrix(s_constants, operator)
+    com_matrix = (liouvillian_matrix.H).dot(liouvillian_matrix)
         
-    return CDagC
+    return com_matrix
 
-def _orthogonalize_cdagc(CDagC, basis, orth_ops):
+def _orthogonalize_com_matrix(com_matrix, basis, orth_ops):
     # Update C_H^\dagger C_H to make its
     # ground state orthogonal to the given
     # operators.
 
-    new_CDagC = CDagC.copy()
+    new_com_matrix = com_matrix.copy()
     
     # Create a projection matrix that projects
     # out of the space spanned by the given operators.
@@ -97,9 +97,9 @@ def _orthogonalize_cdagc(CDagC, basis, orth_ops):
         proj_ops += orth_vec.dot(orth_vec.H)
         
     large_number = 1e10
-    new_CDagC += large_number * proj_ops
+    new_com_matrix += large_number * proj_ops
 
-    return new_CDagC.real
+    return new_com_matrix.real
     
 def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data, allowed_labels=None):
     # Explore the space of OperatorStrings, starting from
@@ -182,9 +182,9 @@ def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_const
                     col_inds.append(col_ind)
                     data.append(coeff * explored_datum)
                 
-    com_matrix = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(extended_basis), len(basis)), dtype=complex)
+    l_matrix = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(extended_basis), len(basis)), dtype=complex)
 
-    return (com_matrix, extended_basis)
+    return (l_matrix, extended_basis)
 
 # TODO: document
 def selected_ci_simple(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=100):
@@ -210,13 +210,13 @@ def selected_ci_simple(initial_operator, H, num_steps, threshold=1e-6, max_basis
         print('Expanded basis: {}'.format(len(basis)))
 
         # Find best operator in basis
-        com_matrix = commutant_matrix(basis, H)
-        CDagC = ((com_matrix.H).dot(com_matrix)).real
+        l_matrix = liouvillian_matrix(basis, H)
+        com_matrix = ((l_matrix.H).dot(l_matrix)).real
 
         if len(basis) < 20:
-            (evals, evecs) = nla.eigh(CDagC.toarray())
+            (evals, evecs) = nla.eigh(com_matrix.toarray())
         else:
-            (evals, evecs) = ssla.eigsh(CDagC, k=8, which='SM')
+            (evals, evecs) = ssla.eigsh(com_matrix, k=8, which='SM')
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
             evecs = evecs[:, inds_sort]
@@ -281,16 +281,16 @@ def selected_ci(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=1
 
         # Find best operator in basis
         (s_constants, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
-        CDagC = _cdagc(s_constants, H).real
+        com_matrix = _com_matrix(s_constants, H).real
         
         if len(basis) < 2*max_num_evecs:
-            (evals, evecs) = nla.eigh(CDagC.toarray())
+            (evals, evecs) = nla.eigh(com_matrix.toarray())
             num_vecs = np.minimum(len(evals), max_num_evecs)
             evals = evals[0:num_vecs]
             evecs = evecs[:,0:num_vecs]
         else:
-            maxiter = 10*int(CDagC.shape[0])*maxiter_scale
-            (evals, evecs) = ssla.eigsh(CDagC, k=max_num_evecs, sigma=-1e-6, which='LM', maxiter=maxiter, tol=tol)
+            maxiter = 10*int(com_matrix.shape[0])*maxiter_scale
+            (evals, evecs) = ssla.eigsh(com_matrix, k=max_num_evecs, sigma=-1e-6, which='LM', maxiter=maxiter, tol=tol)
                     
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
@@ -405,7 +405,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
             if pre_filter_fun is not None:
                 basis = pre_filter_fun(basis)
             
-            # Skip CDagC calculation if the algorithm has converged to a basis.
+            # Skip com_matrix calculation if the algorithm has converged to a basis.
             if set(basis.op_strings) == set(previous_basis.op_strings):
                 continue
             # Also if it gets into a cycle of switching between two bases.
@@ -419,9 +419,9 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
 
             # Find best operator in basis
             (s_constants, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
-            CDagC = _cdagc(s_constants, H).real
+            com_matrix = _com_matrix(s_constants, H).real
 
-            orig_CDagC = CDagC.copy()
+            orig_com_matrix = com_matrix.copy()
             
             # Project against the given operators.
             if orth_ops is not None:
@@ -442,7 +442,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
                     proj_ops += orth_vec.dot(orth_vec.H)
 
                 large_number = 1e12
-                CDagC += large_number * proj_ops
+                com_matrix += large_number * proj_ops
             
             # Rescale C^\dagger C to D^{-1/2} C^\dagger C D^{-1/2}
             # for a given normalization of the OperatorStrings D.
@@ -456,17 +456,17 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
                 D_sqrt     = ss.diags(np.sqrt(basis_norms), format='csc')
                 D_inv_sqrt = ss.diags(1.0 / np.sqrt(basis_norms), format='csc')
                 
-                CDagC = D_inv_sqrt.dot(CDagC.dot(D_inv_sqrt))
-                CDagC = CDagC.real
+                com_matrix = D_inv_sqrt.dot(com_matrix.dot(D_inv_sqrt))
+                com_matrix = com_matrix.real
                 
             if len(basis) < 2*max_num_evecs:
-                (evals, evecs) = nla.eigh(CDagC.toarray())
+                (evals, evecs) = nla.eigh(com_matrix.toarray())
                 num_vecs = np.minimum(len(evals), max_num_evecs)
                 evals = evals[0:num_vecs]
                 evecs = evecs[:,0:num_vecs]
             else:
-                maxiter = 10*int(CDagC.shape[0])*maxiter_scale
-                (evals, evecs) = ssla.eigsh(CDagC, k=max_num_evecs, sigma=-1e-6, which='LM', maxiter=maxiter, tol=tol)
+                maxiter = 10*int(com_matrix.shape[0])*maxiter_scale
+                (evals, evecs) = ssla.eigsh(com_matrix, k=max_num_evecs, sigma=-1e-6, which='LM', maxiter=maxiter, tol=tol)
                 
                 inds_sort = np.argsort(np.abs(evals))
                 evals = evals[inds_sort]
@@ -483,7 +483,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
 
             # Rescale back to the original basis's normalization.
             if norm_fun is not None:
-                CDagC = orig_CDagC
+                com_matrix = orig_com_matrix
                 evecs = np.dot(D_inv_sqrt.toarray(), evecs)
 
                 #print('Original eigenvalues: {}'.format(evals))
@@ -491,7 +491,7 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
                     evecs[:,ind_vec] /= nla.norm(evecs[:,ind_vec])
 
                     vector = ss.csc_matrix(evecs[:,ind_vec].reshape(len(basis),1))
-                    evals[ind_vec] = np.real((vector.H).dot(CDagC).dot(vector)[0,0])
+                    evals[ind_vec] = np.real((vector.H).dot(com_matrix).dot(vector)[0,0])
                 #print('Rescaled eigenvalues: {}'.format(evals))
                 
             if post_filter_fun is not None:
@@ -518,8 +518,8 @@ def selected_ci_sweep(initial_operator, H, num_sweeps, threshold=1e-6, max_basis
 
 # TODO: document
 # Idea: instead of expanding the basis by doing O -> [H,O] -> [H, [H,O]],
-# expand by considering the largest term in [H,O]=\sum_b g_b h_b, say h_{b'},
-# and finding which term in H=\sum_a J_a h_a can cancel it (by going through [h_a. h_{b'}] ordered by the magnitude of J_a).
+# expand by considering the largest term in [H,O]=\sum_b g_b S_b, say S_{b'},
+# and finding which term in H=\sum_a J_a S_a can cancel it (by going through [S_a. S_{b'}] ordered by the magnitude of J_a).
 #
 def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0):
 
@@ -561,8 +561,8 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
         # O -> [H,O]
         (s_constants1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
 
-        com_matrix1    = _com_matrix(s_constants1, H)
-        com_H_operator = com_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
+        l_matrix1    = _l_matrix(s_constants1, H)
+        com_H_operator = l_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
 
         # largest term of [H,O] is A; A -> largest term B in [H,A]
         inds_largest_termsA = np.argsort(np.abs(com_H_operator.toarray().flatten()))[::-1]
@@ -571,10 +571,10 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
             A_basis1 += extended_basis1[indA]
             (s_constants2, extended_basis2) = _explore(A_basis1, H, explored_basis, explored_extended_basis, explored_s_constants_data)
 
-            com_matrix2 = _com_matrix(s_constants2, H)
+            l_matrix2 = _l_matrix(s_constants2, H)
 
             #A = ss.csc_matrix(([1.0], ([0], [0])), shape=(1,1), dtype=complex)
-            com_H_A = com_matrix2.toarray()[:,0]
+            com_H_A = l_matrix2.toarray()[:,0]
             #print('com_H_A = {}'.format(com_H_A))
         
             inds_largest_termsB = np.argsort(np.abs(com_H_A))[::-1]
@@ -593,7 +593,7 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
         
         print('Basis = {}'.format(len(basis)))
             
-        # Skip CDagC calculation if the algorithm has converged to a basis.
+        # Skip com_matrix calculation if the algorithm has converged to a basis.
         if set(basis.op_strings) == set(previous_basis.op_strings):
             continue
         # Also if it gets into a cycle of switching between two bases.
@@ -605,13 +605,13 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
             
         # Find best operator in basis
         (s_constants, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
-        CDagC = _cdagc(s_constants, H).real
+        com_matrix = _com_matrix(s_constants, H).real
         
         if len(basis) < 20:
-            (evals, evecs) = nla.eigh(CDagC.toarray())
+            (evals, evecs) = nla.eigh(com_matrix.toarray())
         else:
-            maxiter = 10*int(CDagC.shape[0])*maxiter_scale
-            (evals, evecs) = ssla.eigsh(CDagC, k=2, sigma=-1e-6, which='LM', maxiter=maxiter, tol=tol)
+            maxiter = 10*int(com_matrix.shape[0])*maxiter_scale
+            (evals, evecs) = ssla.eigsh(com_matrix, k=2, sigma=-1e-6, which='LM', maxiter=maxiter, tol=tol)
             
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
@@ -687,10 +687,10 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
 
         # ==== 1st step: [H,[H,O]] to generate new terms ====
         # O -> [H,O]
-        (com_matrix1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+        (l_matrix1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
         
-        #com_matrix1    = _com_matrix(s_constants1, H)
-        com_H_operator = com_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
+        #l_matrix1    = _l_matrix(s_constants1, H)
+        com_H_operator = l_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
 
         # largest terms of [H,O] are A; A -> largest terms B in [H,A]
         inds_largest_termsA = np.argsort(np.abs(com_H_operator.toarray().flatten()))[::-1]
@@ -699,11 +699,11 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         A_basis1 = Basis([extended_basis1[ind] for ind in inds_largest_termsA])
 
         for com_op in com_ops:
-            (com_matrix2, extended_basis2) = _explore(A_basis1, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
+            (l_matrix2, extended_basis2) = _explore(A_basis1, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
         
-            #com_matrix2 = _com_matrix(s_constants2, com_op)
+            #l_matrix2 = _l_matrix(s_constants2, com_op)
         
-            com_H_A = com_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
+            com_H_A = l_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
             #print('com_H_A = {}'.format(com_H_A))
         
             num_lterms = np.minimum(len(com_H_A), num_H_terms)
@@ -781,7 +781,7 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         if verbose:
             print('Step {}: Basis = {}'.format(step, len(basis)))
             
-        # Skip CDagC calculation if the algorithm has converged to a basis.
+        # Skip com_matrix calculation if the algorithm has converged to a basis.
         if step > 0 and set(basis.op_strings) == set(previous_basis.op_strings):
             if num_H_terms >= max_basis_size:
                 break
@@ -802,25 +802,25 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         previous_basis = copy.deepcopy(basis)
             
         # Find best operator in basis
-        CDagC   = ss.csc_matrix((len(basis), len(basis)), dtype=float)
-        CDagC_H = ss.csc_matrix((len(basis), len(basis)), dtype=float)
+        com_matrix   = ss.csc_matrix((len(basis), len(basis)), dtype=float)
+        com_matrix_H = ss.csc_matrix((len(basis), len(basis)), dtype=float)
         for ind_com_op in range(len(com_ops)):
             com_op = com_ops[ind_com_op]
-            (com_matrix, _) = _explore(basis, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
-            cdagc_real = ((com_matrix.H).dot(com_matrix)).real
-            CDagC += cdagc_real
+            (l_matrix, _) = _explore(basis, com_op, explored_basis, explored_extended_basis, explored_s_constants_data)
+            cdagc_real = ((l_matrix.H).dot(l_matrix)).real
+            com_matrix += cdagc_real
             if ind_com_op == 0:
-                CDagC_H += cdagc_real
+                com_matrix_H += cdagc_real
 
         # Orthogonalize against the given operators.
         if orth_ops is not None:
-            CDagC = _orthogonalize_cdagc(CDagC, basis, orth_ops)
+            com_matrix = _orthogonalize_com_matrix(com_matrix, basis, orth_ops)
 
         if len(basis) < 20:
-            (evals, evecs) = nla.eigh(CDagC.toarray())
+            (evals, evecs) = nla.eigh(com_matrix.toarray())
         else:
-            maxiter = 10*int(CDagC.shape[0])*maxiter_scale
-            (evals, evecs) = ssla.eigsh(CDagC, k=1, sigma=-1e-8, which='LM', maxiter=maxiter, tol=tol)
+            maxiter = 10*int(com_matrix.shape[0])*maxiter_scale
+            (evals, evecs) = ssla.eigsh(com_matrix, k=1, sigma=-1e-8, which='LM', maxiter=maxiter, tol=tol)
 
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
@@ -831,7 +831,7 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         if len(com_ops) > 1 or orth_ops is not None:
             for ind_vec in range(int(evecs.shape[1])):
                 vec = ss.csc_matrix(evecs[:, ind_vec].reshape((len(basis), 1)), dtype=complex)
-                evals[ind_vec] = (vec.H).dot(CDagC_H.dot(vec))[0,0].real
+                evals[ind_vec] = (vec.H).dot(com_matrix_H.dot(vec))[0,0].real
 
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
@@ -976,9 +976,9 @@ def selected_ci_greedy_many_ops2(initial_operators, H, num_steps, num_H_terms=10
             
             # ==== Use [H,[H,O]] to generate new terms ====
             # O -> [H,O]
-            (com_matrix1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+            (l_matrix1, extended_basis1) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
             
-            com_H_operator = com_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
+            com_H_operator = l_matrix1.dot(ss.csc_matrix(operator.coeffs).T)
 
             # largest terms of [H,O] are A; A -> largest terms B in [H,A]
             inds_largest_termsA = np.argsort(np.abs(com_H_operator.toarray().flatten()))[::-1]
@@ -986,9 +986,9 @@ def selected_ci_greedy_many_ops2(initial_operators, H, num_steps, num_H_terms=10
             inds_largest_termsA = inds_largest_termsA[0:num_lterms]
             A_basis1 = Basis([extended_basis1[ind] for ind in inds_largest_termsA])
 
-            (com_matrix2, extended_basis2) = _explore(A_basis1, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+            (l_matrix2, extended_basis2) = _explore(A_basis1, H, explored_basis, explored_extended_basis, explored_s_constants_data)
         
-            com_H_A = com_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
+            com_H_A = l_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
         
             num_lterms = np.minimum(len(com_H_A), num_H_terms[step])
             inds_largest_termsB = np.argsort(np.abs(com_H_A))[::-1]
@@ -1007,7 +1007,7 @@ def selected_ci_greedy_many_ops2(initial_operators, H, num_steps, num_H_terms=10
         if verbose:
             print('Step {}: Basis = {}'.format(step, len(basis)))
             
-        # Skip CDagC calculation if the algorithm has converged to a basis.
+        # Skip com_matrix calculation if the algorithm has converged to a basis.
         if step > 0 and set(basis.op_strings) == set(previous_basis.op_strings):
             break
         # Also if it gets into a cycle of switching between two bases.
@@ -1018,18 +1018,18 @@ def selected_ci_greedy_many_ops2(initial_operators, H, num_steps, num_H_terms=10
         previous_basis = copy.deepcopy(basis)
         
         # Find best operators in basis
-        (com_matrix, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
-        CDagC = ((com_matrix.H).dot(com_matrix)).real
+        (l_matrix, _) = _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data)
+        com_matrix = ((l_matrix.H).dot(l_matrix)).real
             
         # Orthogonalize against the given operators.
         if orth_ops is not None:
-            CDagC = _orthogonalize_cdagc(CDagC, basis, orth_ops)
+            com_matrix = _orthogonalize_com_matrix(com_matrix, basis, orth_ops)
             
         if len(basis) < 20 and num_ops < 20:
-            (evals, evecs) = nla.eigh(CDagC.toarray())
+            (evals, evecs) = nla.eigh(com_matrix.toarray())
         else:
-            maxiter = 10*int(CDagC.shape[0])*maxiter_scale
-            (evals, evecs) = ssla.eigsh(CDagC, k=num_ops, sigma=-1e-8, which='LM', maxiter=maxiter, tol=tol)
+            maxiter = 10*int(com_matrix.shape[0])*maxiter_scale
+            (evals, evecs) = ssla.eigsh(com_matrix, k=num_ops, sigma=-1e-8, which='LM', maxiter=maxiter, tol=tol)
             
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
@@ -1040,7 +1040,7 @@ def selected_ci_greedy_many_ops2(initial_operators, H, num_steps, num_H_terms=10
         if orth_ops is not None:
             for ind_vec in range(int(evecs.shape[1])):
                 vec = ss.csc_matrix(evecs[:, ind_vec].reshape((len(basis), 1)), dtype=complex)
-                evals[ind_vec] = (vec.H).dot(CDagC.dot(vec))[0,0].real
+                evals[ind_vec] = (vec.H).dot(com_matrix.dot(vec))[0,0].real
                 
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]

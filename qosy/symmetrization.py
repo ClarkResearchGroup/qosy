@@ -15,8 +15,8 @@ from .tools import remove_duplicates, compose_permutations, argsort
 
 def _symmetrize_opstring(op_string, symmetry_group):
     """Helper function to `symmetrize_basis`. 
-    From an operator string h_a and a symmetry group G,
-    computes  a symmetrized operator \\sum_{g \\in G} g h_a.
+    From an operator string S_a and a symmetry group G,
+    computes  a symmetrized operator \\sum_{g \\in G} g S_a.
     """
     
     symmetrized_op = Operator([], [], op_string.op_type)
