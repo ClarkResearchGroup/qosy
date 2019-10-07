@@ -112,6 +112,27 @@ def to_operator(matrix, basis, num_orbitals):
 
     return op
 
+# TODO: document, test
+def apply_transformation_conf(transformation, conf, num_orbitals):
+    # Applies a transformation to a spin configuration,
+    # taking it to a new spin configuration.
+    
+    permutation = transformation.info
+    if not (permutation is not None and len(permutation) == num_orbitals):
+        raise ValueError('Transformation is not a valid permutation. Only permutations supported.')
+    
+    permutation = np.array(permutation, dtype=int)
+    
+    new_conf = 0
+    for label in range(num_orbitals):
+        new_label = permutation[label]
+        mask_old_label = (1 << (num_orbitals-1-label))
+        mask_new_label = (1 << (num_orbitals-1-new_label))
+        
+        new_conf += (conf & mask_old_label != 0) * mask_new_label
+
+    return new_conf
+        
 # TODO: document
 # Note: only for spin-1/2 vectors. Not taking into account
 # signs due to reordering fermionic operators.

@@ -327,3 +327,85 @@ def test_inverse_ssh_model_generation():
     # allowed the tolerance to be large.
     tol = 0.05
     assert((op - expected_op).norm() < tol or (op - (-expected_op)).norm() < tol)
+
+def test_ladder_operators():
+
+    #### Check that the method finds that the ladder operator
+    #### of Z is (X+iY)/sqrt(2).
+
+    op    = qy.Operator([1.0], [qy.opstring('Z 0')])
+    basis = qy.cluster_basis(1, [0], 'Pauli')
+
+    expected_ladder_operator = (1.0/np.sqrt(2.0)) * qy.Operator([1.0, 1j], [qy.opstring('X 0'), qy.opstring('Y 0')])
+
+    (ladder_ops, ladder_evals) = qy.core._ladder_operators(basis, op)
+
+    assert(len(ladder_ops)==1)
+    assert((expected_ladder_operator - ladder_ops[0]).norm() < 1e-12 or (expected_ladder_operator + ladder_ops[0]).norm())
+    
+    #### Ladder operator of N = (D+1)/2 is CDag = A + 1j*B
+
+    op    = qy.Operator([1.0], [qy.opstring('D 0')])
+    basis = qy.cluster_basis(1, [0], 'Majorana')
+
+    expected_ladder_operator = (1.0/np.sqrt(2.0)) * qy.Operator([1.0, 1j], [qy.opstring('A 0'), qy.opstring('B 0')])
+
+    (ladder_ops, ladder_evals) = qy.core._ladder_operators(basis, op)
+
+    assert(len(ladder_ops)==1)
+    assert((expected_ladder_operator - ladder_ops[0]).norm() < 1e-12 or (expected_ladder_operator + ladder_ops[0]).norm())
+    
+    #### All BdG Hamiltonians should have N ladder operators
+    #### which correspond to the quasiparticle creation operators.
+    # (There could be fewer if there are zero modes, but generic
+    # BdG Hamiltonians probably don't have zero modes.)
+    
+    num_trials = 10
+    N = 4
+    basis = qy.cluster_basis(1, np.arange(N), 'Majorana')
+    np.random.seed(42)
+    for ind_trial in range(num_trials):
+        coeffs     = []
+        op_strings = []
+        for site1 in range(N):
+            for site2 in range(site1,N):
+                coeffs.append(2.0*np.random.rand()-1.0)
+                op_strings.append(qy.opstring('CDag {} C {}'.format(site2, site1)))
+
+                if site2 != site1:
+                    coeffs.append(2.0*np.random.rand()-1.0)
+                    op_strings.append(qy.opstring('CDag {} CDag {}'.format(site1, site2)))
+
+        bdg_hamiltonian = qy.Operator(coeffs, op_strings)        
+        bdg_hamiltonian = qy.convert(bdg_hamiltonian, 'Majorana')
+
+        (ladder_ops, ladder_evals) = qy.core._ladder_operators(basis, bdg_hamiltonian, sparsification=False)
+
+        assert(len(ladder_ops) == N)
+
+        
+def test_inverse_ladder_operators():
+    
+    #### Find Z from the ladder operator X+iY
+    basis       = qy.cluster_basis(1,[0],'Pauli')
+    ladder_op   = qy.Operator([1.0, 1j], [qy.opstring('X 0'), qy.opstring('Y 0')])
+    expected_op = qy.Operator([1.0], [qy.opstring('Z 0')])
+    
+    (op, null_ops) = qy.core._inverse_ladder_operators(basis, ladder_op)
+    
+    assert((op-expected_op).norm() < 1e-12 or (op+expected_op).norm() < 1e-12)
+    
+    #### Find c_k^\dagger c_k from a particular c_k on one site.
+    basis = qy.cluster_basis([2],[0,1,2],'Majorana')
+    np.random.seed(42)
+    theta = np.pi/4.0 #2.0*np.pi*np.random.rand()
+    phi   = np.pi/2 #2.0*np.pi*np.random.rand()
+    ladder_op = qy.Operator([np.cos(theta), np.sin(theta)*np.exp(1j*phi)], [qy.opstring('A 0'), qy.opstring('B 1')])
+    
+    (op, null_ops) = qy.core._inverse_ladder_operators(basis, ladder_op)
+
+    print('ladder_op = {}'.format(ladder_op))
+    print('op = {}'.format(op))
+    print('null_ops = ')
+    for op in null_ops:
+        print(op.remove_zeros())

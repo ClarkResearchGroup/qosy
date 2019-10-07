@@ -201,6 +201,60 @@ def maximal_cliques(adjacency_lists):
 
     return cliques
 
+def connected_components(adjacency_lists, mode=None):
+    """Find the connected components of an undirected graph.
+
+    Parameters
+    ----------
+    adjacency_lists : list of list of int
+        Specifies the neighbors of each node in the graph.
+
+    mode : str, optional
+        Specifies whether to do a breadth-first-search ('BFS')
+        or depth-first-search ('DFS'). Default is 'DFS'.
+
+    Returns
+    -------
+    list of list of int
+        The connected components of the graph.
+    
+    """
+
+    if mode is None:
+        mode = 'DFS'
+
+    num_nodes = len(adjacency_lists)
+    
+    visited  = set()
+    connected_components = []
+    for node in range(num_nodes):
+        if node not in visited:
+            to_visit            = [node]
+            to_visit_set        = set(to_visit)
+            connected_component = []
+            
+            while len(to_visit) > 0:
+                if mode == 'DFS':
+                    curr_node = to_visit.pop()
+                elif mode == 'BFS':
+                    curr_node = to_visit.pop(0)
+                else:
+                    raise ValueError('Invalid mode: {}'.format(mode))
+                to_visit_set.remove(curr_node)
+                
+                visited.add(curr_node)
+                connected_component.append(curr_node)
+                
+                for neighbor in adjacency_lists[curr_node]:
+                    if (neighbor not in visited) and (neighbor not in to_visit_set):
+                        to_visit.append(neighbor)
+                        to_visit_set.add(neighbor)
+                
+            if len(connected_component) > 0:
+                connected_components.append(connected_component)
+
+    return connected_components
+
 def cmp_to_key(mycmp):
     """Convert a cmp= function into a key= function.
     """

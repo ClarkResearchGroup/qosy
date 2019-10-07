@@ -179,6 +179,8 @@ def invariant_operators(basis, transform, operation_mode='commutator', num_vecs=
     else:
         return vecs
 
+
+    
 class SymmetricOperatorGenerator:
     """A SymmetricOperatorGenerator object can be used to generate
     operators with many desired continuous and discrete symmetries
@@ -578,3 +580,278 @@ class SymmetricOperatorGenerator:
             return self._generate_noncumulative(sparsification=sparsification, orthogonalization=orthogonalization, verbose=verbose, tol=tol)
         else:
             raise ValueError('Invalid operator generation mode: {}'.format(mode))
+
+
+def _ladder_operators(basis, operator, sparsification=False, tol=1e-12, return_operators=True):
+    """Find operators :math:`\\hat{R}` in the vector space spanned by the
+    OperatorStrings :math:`\\hat{\\mathcal{S}}_a` that are (raising) 
+    ladder operators with respect to the operator 
+    :math:`\\hat{\\mathcal{O}} = \\sum_{a} g_a \\hat{\\mathcal{S}}_a`.
+
+    These operators satisfy :math:`[\\hat{O}, \\hat{R}] = (\\delta O) \\hat{R}`
+    where :math:`\\delta O > 0`.
+
+    Parameters
+    ----------
+    basis : Basis
+        The Basis of OperatorStrings :math:`\\hat{\\mathcal{S}}_a` to search in.
+    operator : Operator
+        The Operator :math:`\\hat{\\mathcal{O}}` to be a raising operator of.
+    sparsification : bool, optional
+        Specifies whether to sparsify vectors during the calculations. 
+        Defaults to False.
+    tol : float, optional
+        The numerical cutoff used to determine what eigenvectors
+        are in a null space.
+    return_operators : bool, optional
+        Flag that specifies whether to return a list of Operators
+        instead of numpy array representing vectors in the given basis. 
+        Defaults to True.
+
+    Returns
+    -------
+    list of Operators or ndarray
+        If `return_operators` is False, returns a numpy array
+        whose columns are operators in the given Basis.
+        If `return_operators` is True, returns a list of Operators.
+    """
+    
+    basisA = basis
+
+    # Liouvillian matrix between basisA and basisB
+    (L_A_B, basisB) = liouvillian_matrix(basisA, -operator, return_extended_basis=True)
+
+    # Make a combined AB basis that includes the elements of basisA
+    # (in the same order as before) and the new elements of basisB.
+    op_stringsAB = list(basisA.op_strings)
+    for os_b in basisB:
+        if os_b not in basisA:
+            op_stringsAB.append(os_b)
+    basisAB = Basis(op_stringsAB)
+
+    # Liouvillian matrix between basisAB and basisC
+    (L_AB_C, basisC) = liouvillian_matrix(basisAB, -operator, return_extended_basis=True)
+
+    print('Dim of basisAB = {}\nDim of basisC = {}'.format(len(basisAB), len(basisC)))
+
+    # Project the Liouvillian matrix into basisAB
+    L_AB_C_coo = L_AB_C.tocoo()
+    row_inds = []
+    col_inds = []
+    data     = []
+    for indC, indAB1, val in zip(L_AB_C_coo.row, L_AB_C_coo.col, L_AB_C_coo.data):
+        osC = basisC.op_strings[indC]
+        if osC in basisAB:
+            indAB2 = basisAB.index(osC)
+            row_inds.append(indAB2)
+            col_inds.append(indAB1)
+            data.append(val)
+    
+    L = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(basisAB), len(basisAB)), dtype=complex)
+    # Make it Hermitian
+    #L = 0.5*(L + L.H)
+    
+    #check_hermitian = np.allclose(L.toarray(), L.getH().toarray())
+    #assert(check_hermitian)
+    
+    # Print the different bases.
+    #print('Basis A:\n{}\nBasis AB:\n{}'.format(basisA, basisAB))
+    
+    # Print the final, square, projected, Hermitian Liouvillian matrix in
+    # the basisAB basis.
+    #print('L=\n{}'.format(L.toarray()))
+    
+    # Diagonalize the projected Liouvillian matrix.
+    (evals, evecsAB) = nla.eig(L.toarray())
+    
+    print('All eigenvalues:\n{}'.format(evals))
+    #print('All eigenvectors:\n{}'.format(evecsAB.shape))
+    
+    # Focus on the (real) positive eigenvalue eigenvectors.
+    inds_pos_evals = np.where(np.logical_and(np.imag(evals) < tol, np.real(evals) > tol))[0]
+    
+    #print('inds_pos_evals = {}'.format(inds_pos_evals))
+    
+    # Project the positive eigenvectors out of basisA.
+    projected_evecsAB = evecsAB[:, inds_pos_evals]
+    projected_evecsAB = projected_evecsAB[len(basisA):len(basisAB), :]
+    
+    #print('Projected eigenvectors out of basisA:\n{}'.format(projected_evecsAB.shape))
+    
+    # TODO: modify. Go through each unique positive eigenvalue
+    # subspace separately.
+    # Compute the overlaps of these projected eigenvectors.
+    overlaps_projected = np.dot(np.conj(projected_evecsAB.T), projected_evecsAB)
+    
+    # Find the null space of this overlap matrix. All eigenstates
+    # in the null space must correspond to vectors that only
+    # exist in the original basisA basis.
+    (evals_overlaps, evecs_overlaps) = nla.eigh(overlaps_projected)
+    
+    #print('size(evals_overlaps) = {}'.format(len(evals_overlaps)))
+    print('evals_overlaps = {}'.format(evals_overlaps))
+
+    inds_null_space = np.where(np.abs(evals_overlaps) < tol)[0]
+    num_ladder_ops  = len(inds_null_space)
+
+    if num_ladder_ops == 0:
+        if return_operators:
+            evecs_ladder_ops = []
+        else:
+            evecs_ladder_ops = np.zeros((len(basisA), 0), dtype=complex)
+            
+        return (evecs_ladder_ops, np.zeros(0, dtype=complex))
+    
+    evecs_ladder_ops = np.dot(evecsAB[:, inds_pos_evals], evecs_overlaps[:, inds_null_space])
+    for ind_ev in range(num_ladder_ops):
+        evecs_ladder_ops[:, ind_ev] /= nla.norm(evecs_ladder_ops[:, ind_ev])
+
+    # Project into the positive eigenvalue basis of L (that exists completely in basisA).
+    L_ladder_ops = np.dot(np.conj(evecs_ladder_ops.T), np.dot(L.toarray(), evecs_ladder_ops))
+    check_hermitian = np.allclose(L_ladder_ops, np.conj(L_ladder_ops.T))
+    assert(check_hermitian)
+    
+    (evals_ladder_ops, evecs_lo) = nla.eig(L_ladder_ops)
+
+    evecs_ladder_ops = np.dot(evecs_ladder_ops, evecs_lo)
+    
+    print('evals_ladder_ops = {}'.format(evals_ladder_ops))
+    
+    # Go through each degenerate subspace and sparsify the basis of that subspace.
+    if sparsification:
+        inds_sort = np.argsort(np.real(evals_ladder_ops))
+        evals_ladder_ops = evals_ladder_ops[inds_sort]
+        evecs_ladder_ops = evecs_ladder_ops[:, inds_sort]
+
+        ind_ev = 0
+        while ind_ev < len(evals_ladder_ops):
+            inds_jump = np.where(np.abs(evals_ladder_ops[ind_ev:] - evals_ladder_ops[ind_ev]) > 1e-10)[0]
+
+            if len(inds_jump) == 0:
+                ind_jump = 0
+            else:
+                ind_jump = inds_jump[0]
+
+            inds_degenerate_eval = np.arange(ind_ev, ind_ev+ind_jump)
+            if ind_jump > 1:
+                evecs_ladder_ops[:,inds_degenerate_eval] = sparsify(evecs_ladder_ops[:,inds_degenerate_eval])
+
+                ind_ev += ind_jump
+            else:
+                ind_ev += 1
+        
+    if not return_operators:
+        return (evecs_ladder_ops, evals_ladder_ops)
+    else:
+        ladder_ops = []
+        if isinstance(basis, Basis):
+            for ind_ev in range(num_ladder_ops):
+                ladder_op = Operator(evecs_ladder_ops[:, ind_ev], basisAB.op_strings)
+                ladder_ops.append(ladder_op)
+
+            #print('Ladder operators:')
+            #for op in ladder_ops:
+            #    print(op)
+        elif isinstance(basis, list) and isinstance(basis[0], Operator):
+            raise NotImplementedError('A basis made of a list of Operators is not supported yet.')
+        else:
+            raise ValueError('Invalid basis of type: {}'.format(type(basis)))
+
+        return (ladder_ops, evals_ladder_ops)
+
+def _inverse_ladder_operators(basis, ladder_operator, sparsification=True, tol=1e-12, return_operators=True):
+    """Find operators :math:`\\hat{O}` in the vector space spanned by the
+    OperatorStrings :math:`\\hat{\\mathcal{S}}_a` that have  
+    :math:`\\hat{\\mathcal{R}} = \\sum_{a} g_a \\hat{\\mathcal{S}}_a` as
+    a ladder operator.
+
+    These operators satisfy :math:`[\\hat{O}, \\hat{R}] = (\\delta O) \\hat{R}`
+    where :math:`\\delta O > 0`.
+
+    Parameters
+    ----------
+    basis : Basis
+        The Basis of OperatorStrings :math:`\\hat{\\mathcal{S}}_a` to search in.
+    operator : Operator
+        The Operator :math:`\\hat{\\mathcal{O}}` to be a raising operator of.
+    sparsification : bool, optional
+        Specifies whether to sparsify vectors during the calculations. 
+        Defaults to True.
+    tol : float, optional
+        The numerical cutoff used to determine what eigenvectors
+        are in a null space.
+    return_operators : bool, optional
+        Flag that specifies whether to return a list of Operators
+        instead of numpy array representing vectors in the given basis. 
+        Defaults to True.
+
+    Returns
+    -------
+    (Operator or ndarray, list of Operators or ndarrays)
+        Returns a tuple of the particular solution and the homogenous
+        solutions for the problem.
+        If `return_operators` is False, the tuples contain numpy arrays
+        whose columns are operators in the given Basis.
+        If `return_operators` is True, they contain lists of Operators.
+    """
+    
+    basisA = basis
+    
+    # The Liouvillian matrix for commuting with the ladder operator.
+    (L, basisB) = liouvillian_matrix(basisA, ladder_operator, return_extended_basis=True)
+    
+    # The right null vectors of the Liouvillian matrix.
+    (left_svecs, svals, right_svecs_dag) = nla.svd(L.toarray())
+    inds_null_space = np.where(np.abs(svals) < tol)[0]
+    right_null_vecs = np.conj(right_svecs_dag.T)[:, inds_null_space]
+
+    if sparsification:
+        right_null_vecs = sparsify(right_null_vecs)
+    
+    # Check if the ladder operator can be expressed in basisB.
+    check_ladder_op_in_B = True
+    for (coeff, os) in ladder_operator:
+        if os not in basisB:
+            check_ladder_op_in_B = False
+            break
+    # If it is not in basisB, there are only
+    # homogenous solutions (symmetries) and
+    # no particular solution.
+    if not check_ladder_op_in_B:
+        return (None, right_null_vecs)
+    
+    vector_ladder_op = ladder_operator.to_vector(basisB)
+    
+    # The pseudo-inverse of the Liouvillian matrix.
+    L_pinv = nla.pinv(L.toarray())
+
+    # The particular solution.
+    vector_inverse_op = np.dot(L_pinv, vector_ladder_op)
+
+    # TODO: modify. Keep only the real null vectors.
+
+    print('basisA:\n{}\nbasisB:\n{}'.format(basisA,basisB))
+    print('L  = \n{}'.format(L.toarray()))
+    print('L+ = \n{}'.format(L_pinv))
+    print('vector_ladder_op  = \n{}'.format(vector_ladder_op))
+    print('vector_inverse_op = \n{}'.format(vector_inverse_op))
+    
+    if not return_operators:
+        vector_inverse_op /= nla.norm(vector_inverse_op)
+        return (vector_inverse_op, right_null_vecs)
+    else:
+        inverse_op = Operator(vector_inverse_op, basisA.op_strings)
+        inverse_op = inverse_op.remove_zeros(tol=tol)
+        inverse_op.normalize()
+        
+        null_vec_ops = []
+        if isinstance(basis, Basis):
+            for ind_ev in range(right_null_vecs.shape[1]):
+                null_vec_op = Operator(right_null_vecs[:, ind_ev], basisA.op_strings)
+                null_vec_ops.append(null_vec_op)
+        elif isinstance(basis, list) and isinstance(basis[0], Operator):
+            raise NotImplementedError('A basis made of a list of Operators is not supported yet.')
+        else:
+            raise ValueError('Invalid basis of type: {}'.format(type(basis)))
+
+        return (inverse_op, null_vec_ops)

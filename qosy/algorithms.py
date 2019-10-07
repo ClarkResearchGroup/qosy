@@ -16,6 +16,7 @@ from .tools import intersection, gram_schmidt, sparsify
 from .operatorstring import opstring
 from .basis import Basis, Operator
 from .algebra import commutator, commutant_matrix, structure_constants, product, anticommutator
+from .transformation import symmetry_matrix
     
 def _truncate_basis(basis, vector, threshold=1e-6, max_basis_size=100, filter_fun=None):
     # Truncates a Basis according to the coefficients
@@ -100,7 +101,24 @@ def _orthogonalize_com_matrix(com_matrix, basis, orth_ops):
     new_com_matrix += large_number * proj_ops
 
     return new_com_matrix.real
+
+def _symmetrize_com_matrix(com_matrix, basis, transformations):
+    # Update the commutant matrix to make its
+    # ground state obey the symmetries of the
+    # given transformations.
+
+    new_com_matrix = com_matrix.copy()
+
+    large_number = 1e10
+    for transformation in transformations:
+        matrix = symmetry_matrix(basis, transformation)
+        matrix = 0.5*(matrix + matrix.H)
+        matrix = ss.eye(len(basis), format='csc') - matrix
+        
+        new_com_matrix += large_number * matrix
     
+    return new_com_matrix
+
 def _explore(basis, H, explored_basis, explored_extended_basis, explored_s_constants_data, allowed_labels=None):
     # Explore the space of OperatorStrings, starting from
     # the given Basis. Update the explored_basis, explored_extended_basis,
@@ -638,7 +656,7 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
 # TODO: document, test
 # Idea: Expand the basis by commuting with the largest terms in H
 # and anticommuting with the largest terms in O.
-def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None):
+def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None, transformations=None):
 
     if isinstance(com_ops, Operator):
         H = com_ops
@@ -778,6 +796,21 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
                 if num_terms_added >= num_lterms:
                     break
 
+        # ==== 3rd step: Use transformations to generate new terms ====
+        if transformations is not None:
+            # Apply all of the transformations to expand the basis
+            # until no new operator strings can be added.
+            ind_os = 0
+            while ind_os < len(basis):
+                os = basis[ind_os]
+                for transformation in transformations:
+                    new_op = transformation.apply(os)
+                    for (new_coeff, new_os) in new_op:
+                        if np.abs(new_coeff) > 1e-16 and new_os not in basis:
+                            basis += new_os
+
+                ind_os += 1
+        
         if verbose:
             print('Step {}: Basis = {}'.format(step, len(basis)))
             
@@ -816,6 +849,9 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
         if orth_ops is not None:
             com_matrix = _orthogonalize_com_matrix(com_matrix, basis, orth_ops)
 
+        if transformations is not None:
+            com_matrix = _symmetrize_com_matrix(com_matrix, basis, transformations)
+            
         if len(basis) < 20:
             (evals, evecs) = nla.eigh(com_matrix.toarray())
         else:

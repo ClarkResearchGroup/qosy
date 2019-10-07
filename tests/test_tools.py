@@ -89,7 +89,27 @@ def test_maximal_cliques():
     expected_maximal_cliques_set = set([(0,1,4), (1,2), (2,3), (3,4), (3,5)])
     
     assert(maximal_cliques_set == expected_maximal_cliques_set)
-                              
+
+def test_connected_components():
+    # Graph with two connected components, [0,1,2,3] and [4,5]
+    adjacency_lists = [[1,2], [0,2,3], [0,1], [1], [5], [4]]
+    
+    c_components = qy.tools.connected_components(adjacency_lists, mode='BFS')
+    
+    expected_c_comps = set([(0,1,2,3), (4,5)])
+    assert(len(c_components) == 2)
+    for c_comp in c_components:
+        c_comp_tuple = tuple(np.sort(c_comp))
+        assert(c_comp_tuple in expected_c_comps)
+        
+    c_components = qy.tools.connected_components(adjacency_lists, mode='DFS')
+    
+    expected_c_comps = set([(0,1,2,3), (4,5)])
+    assert(len(c_components) == 2)
+    for c_comp in c_components:
+        c_comp_tuple = tuple(np.sort(c_comp))
+        assert(c_comp_tuple in expected_c_comps)
+        
 def test_gram_schmidt():
     # Do a simple check by hand.
     matrix = np.array([[1., 1.,  2.],\
