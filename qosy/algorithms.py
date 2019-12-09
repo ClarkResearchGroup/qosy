@@ -653,11 +653,54 @@ def selected_ci_greedy_simple(initial_operator, H, num_steps, threshold=1e-6, ma
     return (best_operator, best_com_norm, operators, com_norms)
 
 
+# Helper method for selected_ci_greedy that finds the
+# operator O, which is a linear combination of the given
+# eigenvectors of the commutant matrix, with the highest
+# overlap with target_operator.
+def highest_fidelity_operator(target_operator, evecs, evals, basis):
+
+    # The target_operator projected into the given basis.
+    target_op_vector = np.zeros(len(basis), dtype=complex)
+    for (coeff, op_string) in target_operator:
+        if op_string in basis:
+            ind_vec                   = basis.index(op_string)
+            target_op_vector[ind_vec] = coeff
+    
+    num_evecs = int(evecs.shape[1])
+    
+    # The overlaps of the target_operator and the given eigenvectors.
+    overlaps = np.zeros(num_evecs, dtype=complex)
+    
+    # The vector which is a linear combination of the given eigenvectors
+    # that has the highest overlap with target_op_vector.
+    vector = np.zeros(len(basis), dtype=complex)
+
+    # The commutator norm of vector.
+    com_norm = 0.0
+    
+    for ind_evec in range(num_evecs):
+        overlaps[ind_evec] = np.dot(np.conj(evecs[:, ind_evec]), target_op_vector)
+        
+        vector   += overlaps[ind_evec] * evecs[:, ind_evec]
+        com_norm += np.abs(overlaps[ind_evec])**2.0 * np.abs(evals[ind_evec])
+
+    norm_vector = nla.norm(vector)
+    vector     /= norm_vector
+    com_norm   /= norm_vector**2.0
+
+    fidelity = norm_vector**2.0
+
+    print('  (Overlaps  = {})'.format(overlaps))
+    print('  (Com norms = {})'.format(evals))
+    print('  (Fidelity  = {})'.format(fidelity))
+    
+    return (vector, com_norm, fidelity)
+
 # TODO: document, test
 # Idea: Expand the basis by commuting with the largest terms in H
 # and anticommuting with the largest terms in O.
-def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None, transformations=None):
-
+def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num_O_terms=0, threshold=1e-6, max_basis_size=100, explored_data=None, maxiter_scale=1, tol=0.0, verbose=True, orth_ops=None, transformations=None, target_com_norm=None, min_relative_change=None, sigma=None, num_vecs=None, target_operator=None, target_fidelity=None, return_final_params=False):
+    
     if isinstance(com_ops, Operator):
         H = com_ops
         com_ops = [H]
@@ -666,6 +709,24 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
     else:
         raise ValueError('Invalid com_ops of type: {}'.format(type(com_ops)))
 
+    if isinstance(max_basis_size, list) or isinstance(max_basis_size, np.ndarray):
+        max_basis_sizes_arr = np.array(max_basis_size, dtype=int)
+    else:
+        max_basis_sizes_arr = max_basis_size * np.ones(num_steps, dtype=int)
+    
+    if isinstance(num_H_terms, list) or isinstance(num_H_terms, np.ndarray):
+        num_H_terms_arr = np.array(num_H_terms, dtype=int)
+    else:
+        num_H_terms_arr = num_H_terms * np.ones(num_steps, dtype=int)
+    
+    if sigma is None:
+        sigma = -1e-8
+    
+    if num_vecs is None:
+        num_vecs = 1
+    
+    ncv = 40*num_vecs
+    
     H_labels = np.array([label for os in H._basis for (_, label) in os], dtype=int)
     max_label = np.max(H_labels)
 
@@ -699,7 +760,9 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
 
     previous_previous_basis = None
     previous_basis = copy.deepcopy(basis)
-    for step in range(num_steps):
+    step = 0
+    end_early = False # Flag used to indicate whether SCI will end at the
+    while step < num_steps and not end_early:
         if step == 0:
             operator = copy.deepcopy(initial_operator)
 
@@ -712,7 +775,7 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
 
         # largest terms of [H,O] are A; A -> largest terms B in [H,A]
         inds_largest_termsA = np.argsort(np.abs(com_H_operator.toarray().flatten()))[::-1]
-        num_lterms = np.minimum(len(inds_largest_termsA), num_H_terms)
+        num_lterms = np.minimum(len(inds_largest_termsA), num_H_terms_arr[step])
         inds_largest_termsA = inds_largest_termsA[0:num_lterms]
         A_basis1 = Basis([extended_basis1[ind] for ind in inds_largest_termsA])
 
@@ -724,7 +787,7 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
             com_H_A = l_matrix2.dot(com_H_operator[inds_largest_termsA,0]).toarray().flatten()
             #print('com_H_A = {}'.format(com_H_A))
         
-            num_lterms = np.minimum(len(com_H_A), num_H_terms)
+            num_lterms = np.minimum(len(com_H_A), num_H_terms_arr[step])
             inds_largest_termsB = np.argsort(np.abs(com_H_A))[::-1]
             #inds_largest_termsB = inds_largest_termsB[0:num_lterms]
         
@@ -812,28 +875,31 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
                 ind_os += 1
         
         if verbose:
-            print('Step {}: Basis = {}'.format(step, len(basis)))
-            
+            print('Step {}: Basis = {}, |[H,O]|^2 = {}'.format(step, len(basis), best_com_norm))
+
+
+        # For now, we will not look for this behavior.
+        """
         # Skip com_matrix calculation if the algorithm has converged to a basis.
         if step > 0 and set(basis.op_strings) == set(previous_basis.op_strings):
-            if num_H_terms >= max_basis_size:
+            if num_H_terms_arr[step] >= max_basis_sizes_arr[step]:
                 break
             else:
-                num_H_terms *= 2
-                if verbose:
-                    print(' num_H_terms = {}'.format(num_H_terms))
+                if step < num_steps-1:
+                    num_H_terms_arr[(step+1):] *= 2
+                    if verbose:
+                        print('  num_H_terms = {}'.format(num_H_terms_arr[step+1]))
         # Also if it gets into a cycle of switching between two bases.
         elif step > 0 and previous_previous_basis is not None and set(basis.op_strings) == set(previous_previous_basis.op_strings):
-            if num_H_terms >= max_basis_size:
+            if num_H_terms_arr[step] >= max_basis_sizes_arr[step]:
                 break
             else:
-                num_H_terms *= 2
-                if verbose:
-                    print(' num_H_terms = {}'.format(num_H_terms))
-        
-        previous_previous_basis = copy.deepcopy(previous_basis)
-        previous_basis = copy.deepcopy(basis)
-            
+                if step < num_steps-1:
+                    num_H_terms_arr[(step+1):] *= 2
+                    if verbose:
+                        print(' num_H_terms = {}'.format(num_H_terms_arr[step+1]))
+        """
+ 
         # Find best operator in basis
         com_matrix   = ss.csc_matrix((len(basis), len(basis)), dtype=float)
         com_matrix_H = ss.csc_matrix((len(basis), len(basis)), dtype=float)
@@ -851,12 +917,18 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
 
         if transformations is not None:
             com_matrix = _symmetrize_com_matrix(com_matrix, basis, transformations)
-            
-        if len(basis) < 20:
+
+        #import matplotlib.pyplot as plt
+        #plt.matshow(np.log(np.abs(com_matrix).toarray()), cmap=plt.get_cmap('Spectral'))
+        #plt.colorbar()
+        #plt.show()
+        
+        if len(basis) < 20 or num_vecs >= len(basis):
             (evals, evecs) = nla.eigh(com_matrix.toarray())
         else:
-            maxiter = 10*int(com_matrix.shape[0])*maxiter_scale
-            (evals, evecs) = ssla.eigsh(com_matrix, k=1, sigma=-1e-8, which='LM', maxiter=maxiter, tol=tol)
+            maxiter  = 10*int(com_matrix.shape[0])*maxiter_scale
+            
+            (evals, evecs) = ssla.eigsh(com_matrix, k=num_vecs, ncv=ncv, sigma=sigma, which='LM', maxiter=maxiter, tol=tol)
 
             inds_sort = np.argsort(np.abs(evals))
             evals = evals[inds_sort]
@@ -873,9 +945,71 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
             evals = evals[inds_sort]
             evecs = evecs[:, inds_sort]
 
-        vector   = evecs[:,0]
-        com_norm = evals[0]
+        if target_operator is None:
+            vector   = evecs[:,0]
+            com_norm = evals[0]
+        else:
+            # On the first step, target_op is
+            # the given target_operator provided as input to SCI
+            if step == 0:
+                target_op = copy.deepcopy(target_operator)
+            # After that, it is the current best_operator
+            # found by SCI.
+            else:
+                target_op = copy.deepcopy(best_operator)
+            
+            # Finds the operator O in the given basis that
+            # has the highest overlap with target_op
+            # and returns its vector representation and its
+            # commutator norm with the Hamiltonian |[H, O]|^2,
+            # even though it is not an eigenstate of the commutant matrix.
+            (vector, com_norm, fidelity) = highest_fidelity_operator(target_op, evecs, evals, basis)
+            
+            if target_fidelity is not None and (fidelity < target_fidelity):
+                # If it fails on the first step, it likely
+                # will keep failing.
+                if step == 0:
+                    # End early.
+                    end_early = True
+                    if verbose:
+                        print('  fidelity = {} < {}, ending early.'.format(fidelity, target_fidelity))
+                else:
+                    num_vecs += 1
+                    basis     = copy.deepcopy(previous_basis)
+                    if verbose:
+                        print('  num_vecs = {}'.format(num_vecs))
+                    continue
+            
         
+        relative_change = np.abs(com_norm - best_com_norm)/best_com_norm
+        if verbose and step > 0:
+            print('  Relative change in |[H, O]|^2 = {}'.format(relative_change))
+
+        # If the commutator norm gets *worse*,
+        # lower the threshold for truncating the basis.
+        if com_norm - best_com_norm > 1e-16:
+            threshold /= 2.0
+            if verbose:
+                print('  threshold   = {}'.format(threshold))
+
+        # If min_relative_change is provided, then make sure
+        # that at each step of SCI that the relative improvement
+        # of the commutator norm is above min_relative_change.
+        # If it is not, then modify the SCI parameters.
+        if min_relative_change is not None and step >= 1:
+            if com_norm - best_com_norm > 1e-16 or relative_change < min_relative_change:
+                end_early = True
+                if verbose:
+                    print('  Relative change positive or < {}, ending early.'.format(min_relative_change))
+                """
+                #threshold /= 2.0
+                if step < num_steps-1:
+                    num_H_terms_arr[(step+1):] *= 2
+                if verbose:
+                    print('  num_H_terms = {}'.format(num_H_terms_arr[step+1]))
+                    #print('  threshold   = {}'.format(threshold))
+               """
+ 
         operator = Operator(vector, copy.deepcopy(basis.op_strings))
         operators.append(copy.deepcopy(operator))
         com_norms.append(com_norm)
@@ -885,15 +1019,41 @@ def selected_ci_greedy(initial_operator, com_ops, num_steps, num_H_terms=10, num
             best_com_norm = com_norm
         
         # Truncate basis
-        basis = _truncate_basis(basis, evecs[:,0], threshold=threshold, max_basis_size=max_basis_size)
+        basis = _truncate_basis(basis, evecs[:,0], threshold=threshold, max_basis_size=max_basis_sizes_arr[step])
         if verbose:
             print('  Truncated basis: {}'.format(len(basis)))
 
         # Truncate the operator into the new basis
         new_coeffs = [vector[basis.index(os)] for os in basis]
         operator = Operator(new_coeffs, basis.op_strings)
+
+        # Stop early if reached the target commutator norm threshold.
+        if target_com_norm is not None and (best_com_norm < target_com_norm):
+            if verbose:
+                print('  Terminated early since |[H,O]|^2 = {} < {}'.format(best_com_norm, target_com_norm))
+            break
+
+        previous_previous_basis = copy.deepcopy(previous_basis)
+        previous_basis          = copy.deepcopy(basis)
+
+        step += 1
+
+    result = (best_operator, best_com_norm, operators, com_norms)
+
+    if return_final_params:
+        params_dict = dict()
+        params_dict['num_H_terms']         = num_H_terms
+        params_dict['threshold']           = threshold
+        params_dict['max_basis_size']      = max_basis_size
+        params_dict['tol']                 = tol
+        params_dict['target_com_norm']     = target_com_norm
+        params_dict['min_relative_change'] = min_relative_change
+        params_dict['sigma']               = sigma
+        params_dict['num_vecs']            = num_vecs
+        params_dict['target_fidelity']     = target_fidelity
+        result = result + (params_dict,)
         
-    return (best_operator, best_com_norm, operators, com_norms)
+    return result
 
 # TODO: document, test
 # Idea: Try to iteratively find many operators that commute with H.

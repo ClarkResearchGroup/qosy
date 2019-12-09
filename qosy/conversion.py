@@ -99,7 +99,7 @@ def _fermion_string_from_cdag_c_labels(prefactor, c_dag_labels, c_labels):
     
     return OperatorString(orbital_operators, orbital_labels, prefactor=prefactor, op_type='Fermion')
 
-def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
+def _convert_majorana_string(op_string, include_identity=False):
     # Converts a Majorana string to an Operator
     # that is a linear combination of Fermion strings.
     
@@ -192,11 +192,11 @@ def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
             coeffs_fermion.append(coeff)
             op_strings_fermion.append(_fermion_string_from_cdag_c_labels(1.0, cdag_labels, c_labels))
         # Resulting operator is of type 2: c^\dagger_{i_1} \cdots c^\dagger_{i_m} c_{j_l} \cdots c_{j_1} + H.c.
-        elif lex_order > 0 and np.abs(np.imag(coeff)) < tol:
+        elif lex_order > 0 and np.abs(np.imag(coeff)) < np.finfo(float).eps:
             coeffs_fermion.append(np.real(coeff))
             op_strings_fermion.append(_fermion_string_from_cdag_c_labels(1.0, cdag_labels, c_labels))
         # Resulting operator is of type 3: ic^\dagger_{i_1} \cdots c^\dagger_{i_m} c_{j_l} \cdots c_{j_1} + H.c.
-        elif lex_order > 0 and np.abs(np.real(coeff)) < tol:
+        elif lex_order > 0 and np.abs(np.real(coeff)) < np.finfo(float).eps:
             coeffs_fermion.append(np.real(coeff/(1j)))
             op_strings_fermion.append(_fermion_string_from_cdag_c_labels(1j, cdag_labels, c_labels))
         else:
@@ -205,7 +205,7 @@ def _convert_majorana_string(op_string, include_identity=False, tol=1e-12):
     return Operator(np.array(coeffs_fermion), op_strings_fermion)
 
 
-def _convert_fermion_string(op_string, include_identity=False, tol=1e-12):
+def _convert_fermion_string(op_string, include_identity=False):
     # Converts a Fermion string into an Operator
     # that is a linear combination of Majorana strings.
 
@@ -297,7 +297,7 @@ def _convert_fermion_string(op_string, include_identity=False, tol=1e-12):
         # if an operator ends up being anti-Hermitian, then it cancels with the Hermitian conjugate.
         # Otherwise, its coefficient doubles because it equals the Hermitian conjugate.
         if cdag_labels != c_labels:
-            if np.abs(np.imag(coeffM)) > tol:
+            if np.abs(np.imag(coeffM)) > np.finfo(float).eps: #1e-16:
                 continue
             else:
                 coeffM *= 2.0
@@ -356,8 +356,8 @@ def _convert_operator(operator, to_op_type, include_identity=False):
         
         new_operator += coeff * new_op_from_op_string
 
-    # Remove the unnecessary entries that cancelled during the conversion.
-    new_operator = new_operator.remove_zeros()
+    # Remove the unnecessary entries that cancelled during the conversion. 
+    #new_operator = new_operator.remove_zeros(tol=tol)
     
     return new_operator
 
@@ -413,7 +413,7 @@ def convert(operator, to_op_type, include_identity=False):
     else:
         raise TypeError('Cannot convert invalid operator type: {}'.format(type(operator)))
 
-def conversion_matrix(basis_from, basis_to, tol=1e-12):
+def conversion_matrix(basis_from, basis_to, tol=1e-16):
     """Construct a basis transformation matrix for
     converting between two different Bases of 
     OperatorStrings.
@@ -442,6 +442,9 @@ def conversion_matrix(basis_from, basis_to, tol=1e-12):
         The Basis of OperatorStrings to convert from.
     basis_to : Basis
         The Basis of OperatorStrings to convert to.
+    tol : float, optional
+        The tolerance to truncate entries of the conversion matrix.
+        Defaults to 1e-16.
 
     Returns
     -------

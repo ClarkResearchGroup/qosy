@@ -582,7 +582,7 @@ class SymmetricOperatorGenerator:
             raise ValueError('Invalid operator generation mode: {}'.format(mode))
 
 
-def _ladder_operators(basis, operator, sparsification=False, tol=1e-12, return_operators=True):
+def _ladder_operators_original(basis, operator, sparsification=False, tol=1e-14, return_operators=True):
     """Find operators :math:`\\hat{R}` in the vector space spanned by the
     OperatorStrings :math:`\\hat{\\mathcal{S}}_a` that are (raising) 
     ladder operators with respect to the operator 
@@ -747,6 +747,239 @@ def _ladder_operators(basis, operator, sparsification=False, tol=1e-12, return_o
         if isinstance(basis, Basis):
             for ind_ev in range(num_ladder_ops):
                 ladder_op = Operator(evecs_ladder_ops[:, ind_ev], basisAB.op_strings)
+                ladder_ops.append(ladder_op)
+
+            #print('Ladder operators:')
+            #for op in ladder_ops:
+            #    print(op)
+        elif isinstance(basis, list) and isinstance(basis[0], Operator):
+            raise NotImplementedError('A basis made of a list of Operators is not supported yet.')
+        else:
+            raise ValueError('Invalid basis of type: {}'.format(type(basis)))
+
+        return (ladder_ops, evals_ladder_ops)
+
+def _ladder_operators(basis, operator, sparsification=False, tol=1e-12, return_operators=True):
+    # Alternative version of _ladder_operators().
+    
+    basisA = basis
+
+    # Liouvillian matrix between basisA and basisB.
+    (L_A_B, basisB) = liouvillian_matrix(basisA, -operator, return_extended_basis=True)
+
+    # The smallest basis that includes only operators from basisA and basisB.
+    smallest_basisAB_opstrings = [os for os in basisA if os in basisB]
+    smallest_basisAB           = Basis(smallest_basisAB_opstrings)
+
+    if len(smallest_basisAB) == 0:
+        if return_operators:
+            evecs_ladder_ops = []
+        else:
+            evecs_ladder_ops = np.zeros((len(basisA), 0), dtype=complex)
+            
+        return (evecs_ladder_ops, np.zeros(0, dtype=complex))
+    
+    # Find the relevant indices of operator strings in different bases.
+    inds_os_AB_in_A    = []
+    inds_os_AB_in_B    = []
+    inds_os_notAB_in_A = []
+    inds_os_notAB_in_B = []
+    ind_os_B  = 0
+    for os in basisB:
+        if os in basisA:
+            inds_os_AB_in_A.append(basisA.index(os))
+            inds_os_AB_in_B.append(ind_os_B)
+        else:
+            inds_os_notAB_in_B.append(ind_os_B)
+        ind_os_B += 1
+    ind_os_A = 0
+    for os in basisA:
+        if os not in basisB:
+            inds_os_notAB_in_A.append(ind_os_A)
+        ind_os_A += 1
+        
+    # The full Liouvillian matrix.
+    L = L_A_B #.toarray()
+
+    # The original Liouvillian matrix projected into the smallest
+    # basis made of operators in both basisA and basisB.
+    # L_AB: A \intersect B -> A \intersect B
+    L_AB = L[inds_os_AB_in_B, :]
+    L_AB = L_AB[:, inds_os_AB_in_A].toarray()
+
+    print('basisA     = \n{}'.format(basisA))
+    print('basisB     = \n{}'.format(basisB))
+    print('smallest_basisAB = \n{}'.format(smallest_basisAB))
+    
+    if len(inds_os_notAB_in_B) > 0:
+        # The Liouvillian matrix whose output is projected out of basisAB.
+        # L_notAB: A \intersect B -> B/(A \intersect B) = B/A
+        L_notAB = L[inds_os_notAB_in_B, :]
+        L_notAB = L_notAB[:, inds_os_AB_in_A].toarray()
+
+        # Perform SVD on the L_notAB to determine the right null vectors.
+        # These are the vectors we care about: they stay in basisAB after
+        # applying the Liouvillian matrix.
+        (left_svecs, svals, right_svecsH) = nla.svd(L_notAB)
+
+        inds_zero_svals = np.where(np.abs(svals) < tol)[0]
+        print('inds_zero_svals = {}'.format(inds_zero_svals))
+        valid_vecs      = np.conj(np.transpose(right_svecsH))[:, inds_zero_svals]
+        
+        print('svals      = {}'.format(svals))
+        #print('valid_vecs = {}'.format(valid_vecs))
+
+        # The L_A matrix projected onto the valid vectors that stay in basisA.
+        projected_L = np.dot(np.conj(np.transpose(valid_vecs)), np.dot(L_AB, valid_vecs))
+    else:
+        projected_L = L_AB
+
+    print('projected_L = {}'.format(projected_L))
+    check_hermitian = np.allclose(np.conj(np.transpose(projected_L))-projected_L, np.zeros(projected_L.shape))
+    print('projected_L is Hermitian: {}'.format(check_hermitian))
+        
+    # Perform eigendecomposition on the projected L matrix.
+    (evals, evecs) = nla.eigh(0.5*(projected_L + np.conj(np.transpose(projected_L))))
+
+    print('evals = {}'.format(evals))
+    #print('evecs = {}'.format(evecs))
+
+    # Find all of the positive eigenvalues that
+    # come paired with a negative eigenvalue partner.
+    inds_pos           = np.where(np.logical_and(np.imag(evals) < tol, np.real(evals) > tol))[0]
+    inds_pos_partnered = []
+    for ind_pos_ev in inds_pos:
+        inds_neg_ev = np.where(np.abs(evals[ind_pos_ev] + evals) < tol)[0]
+        if len(inds_neg_ev) > 0: 
+            inds_pos_partnered.append(ind_pos_ev)
+
+    print('inds_pos           = {}'.format(inds_pos))
+    print('inds_pos_partnered = {}'.format(inds_pos_partnered))
+            
+    ladder_evals = np.real(evals[inds_pos_partnered])
+    if len(inds_os_notAB_in_B) > 0:
+        ladder_evecsAB = np.dot(valid_vecs, evecs[:, inds_pos_partnered])
+    else:
+        ladder_evecsAB = evecs[:, inds_pos_partnered]
+        
+    ladder_evecs                     = np.zeros((len(basisA), len(ladder_evals)), dtype=complex) 
+    ladder_evecs[inds_os_AB_in_A, :] = ladder_evecsAB
+
+    # Post-process the eigenvalues and eigenvectors.
+    inds_sort = np.argsort(ladder_evals)
+
+    evals_ladder_ops = ladder_evals[inds_sort]
+    evecs_ladder_ops = ladder_evecs[:, inds_sort]
+
+    num_ladder_ops = len(evals_ladder_ops)
+    if num_ladder_ops == 0:
+        if return_operators:
+            evecs_ladder_ops = []
+            
+        return (evecs_ladder_ops, evals_ladder_ops)
+    
+    """
+    # Perform SVD on the Liouvillian matrix.
+    (left_svecsB, svals, right_svecsAH) = nla.svd(L)
+    right_svecsA = np.conj(np.transpose(right_svecsAH))
+
+    # Identify the degenerate positive singular values subspaces.
+    degenerate_subspace_inds = []
+    degenerate_subspace_sval = []
+    visited_inds = set()
+    for ind_sv in range(len(svals)):
+        subspace_inds = []
+        inds_deg = np.where(np.logical_and(np.abs(svals[ind_sv]-svals) < tol, np.abs(svals) > tol))[0]
+        for ind_deg in inds_deg:
+            if ind_deg not in visited_inds:
+                subspace_inds.append(ind_deg)
+                visited_inds.add(ind_deg)
+        if len(subspace_inds) > 0:
+            degenerate_subspace_inds.append(subspace_inds)
+            degenerate_subspace_sval.append(svals[ind_sv])
+
+    
+
+    projector_B_to_A = np.zeros((len(basisA), len(basisB)), dtype=complex)
+    
+    for ind_os_b in range(len(basisB)):
+        os_b = basisB.op_strings[ind_os_b]
+        if os_b in basisA:
+            ind_os_a                             = basisA.index(os_b)
+            projector_B_to_A[ind_os_a, ind_os_b] = 1.0
+
+    projected_L = np.dot(projector_B_to_A, L)
+
+    # For each degenerate subspace, project onto the right
+    # singular vectors with singular value s and see if
+    # the eigenvalues of the projected matrix are +/- s.
+    # If they are, then the projection preserved the
+    # singular vectors as eigenvectors of the projected
+    # matrix.
+    num_ladder_ops   = 0
+    evecs_ladder_ops = []
+    evals_ladder_ops = []
+    for (subspace_inds, subspace_sval) in zip(degenerate_subspace_inds, degenerate_subspace_sval):
+        if len(subspace_inds) > 1:    
+            right_vecs = right_svecsA[:, subspace_inds]
+            
+            subspace_L = np.dot(np.conj(np.transpose(right_vecs)), np.dot(projected_L, right_vecs))
+
+            (evals_sub, evecs_sub) = nla.eig(subspace_L)
+
+            inds_eval_matches_sval  = np.where(np.abs(evals_sub - subspace_sval) < tol)[0]
+            inds_eval_matches_msval = np.where(np.abs(evals_sub + subspace_sval) < tol)[0]
+
+            assert(len(inds_eval_matches_sval) == len(inds_eval_matches_msval))
+
+            if len(inds_eval_matches_sval) > 0:
+                evals_ladder_ops.append(evals_sub[inds_eval_matches_sval])
+                evecs_ladder_ops.append(evecs_sub[inds_eval_matches_sval])
+
+                num_ladder_ops += len(inds_eval_matches_sval)
+                
+    if num_ladder_ops == 0:
+        if return_operators:
+            evecs_ladder_ops = []
+        else:
+            evecs_ladder_ops = np.zeros((len(basisA), 0), dtype=complex)
+            
+        return (evecs_ladder_ops, np.zeros(0, dtype=complex))
+    
+    evals_ladder_ops = np.concatenate(tuple(evals_ladder_ops))
+    evecs_ladder_ops = np.hstack(tuple(evecs_ladder_ops))
+    """
+    
+    # Go through each degenerate subspace and sparsify the basis of that subspace.
+    if sparsification:
+        inds_sort = np.argsort(np.real(evals_ladder_ops))
+        evals_ladder_ops = evals_ladder_ops[inds_sort]
+        evecs_ladder_ops = evecs_ladder_ops[:, inds_sort]
+
+        ind_ev = 0
+        while ind_ev < len(evals_ladder_ops):
+            inds_jump = np.where(np.abs(evals_ladder_ops[ind_ev:] - evals_ladder_ops[ind_ev]) > 1e-10)[0]
+
+            if len(inds_jump) == 0:
+                ind_jump = 0
+            else:
+                ind_jump = inds_jump[0]
+
+            inds_degenerate_eval = np.arange(ind_ev, ind_ev+ind_jump)
+            if ind_jump > 1:
+                evecs_ladder_ops[:,inds_degenerate_eval] = sparsify(evecs_ladder_ops[:,inds_degenerate_eval])
+
+                ind_ev += ind_jump
+            else:
+                ind_ev += 1
+        
+    if not return_operators:
+        return (evecs_ladder_ops, evals_ladder_ops)
+    else:
+        ladder_ops = []
+        if isinstance(basis, Basis):
+            for ind_ev in range(num_ladder_ops):
+                ladder_op = Operator(evecs_ladder_ops[:, ind_ev], basisA.op_strings)
                 ladder_ops.append(ladder_op)
 
             #print('Ladder operators:')

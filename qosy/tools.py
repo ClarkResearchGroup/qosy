@@ -586,3 +586,24 @@ def sparsify(vectors, orthogonalize=True, tol=1e-12):
     vectors_rre = vectors_rre[:, inds_sort]
         
     return vectors_rre
+
+# TODO: test, document
+def project_out_nullspace(matrix, tol=1e-14):
+    # Idea: Repeatedly compute the null space of
+    # the input (non-invertible) square matrix and
+    # project out against it to make a smaller square matrix.
+    # Do this until there is either no matrix or
+    # a square invertible matrix.
+    
+    n = int(matrix.shape[0])
+    m = int(matrix.shape[1])
+    
+    assert(m == len(inds_basisA))
+    assert(n == len(inds_basisB))
+    
+    (left_svecs, svals, right_svecsH) = nla.svd(matrix)
+
+    inds_zero_svals = np.where(np.abs(svals) < tol)[0]
+    
+    # TODO: work out details
+    raise NotImplementedError('Not finished yet.')

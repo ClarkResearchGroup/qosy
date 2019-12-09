@@ -342,6 +342,10 @@ def test_ladder_operators():
 
     assert(len(ladder_ops)==1)
     assert((expected_ladder_operator - ladder_ops[0]).norm() < 1e-12 or (expected_ladder_operator + ladder_ops[0]).norm())
+
+    # Check that [H,O] = \lambda O
+    com_H_O = qy.commutator(op, ladder_ops[0])
+    assert((com_H_O - ladder_evals[0]*ladder_ops[0]).norm() < 1e-12)
     
     #### Ladder operator of N = (D+1)/2 is CDag = A + 1j*B
 
@@ -354,6 +358,10 @@ def test_ladder_operators():
 
     assert(len(ladder_ops)==1)
     assert((expected_ladder_operator - ladder_ops[0]).norm() < 1e-12 or (expected_ladder_operator + ladder_ops[0]).norm())
+    
+    # Check that [H,O] = \lambda O
+    com_H_O = qy.commutator(op, ladder_ops[0])
+    assert((com_H_O - ladder_evals[0]*ladder_ops[0]).norm() < 1e-12)
     
     #### All BdG Hamiltonians should have N ladder operators
     #### which correspond to the quasiparticle creation operators.
@@ -380,10 +388,15 @@ def test_ladder_operators():
         bdg_hamiltonian = qy.convert(bdg_hamiltonian, 'Majorana')
 
         (ladder_ops, ladder_evals) = qy.core._ladder_operators(basis, bdg_hamiltonian, sparsification=False)
-
-        assert(len(ladder_ops) == N)
-
         
+        assert(len(ladder_ops) == N)
+        
+        for (l_op, l_op_eval) in zip(ladder_ops, ladder_evals):
+            # Check that [H,O] = \lambda O
+            com_H_O = qy.commutator(bdg_hamiltonian, l_op)
+            assert((com_H_O - l_op_eval*l_op).norm() < 1e-12)
+
+# TODO: finish second part of test
 def test_inverse_ladder_operators():
     
     #### Find Z from the ladder operator X+iY

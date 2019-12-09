@@ -301,8 +301,10 @@ class Operator:
             The coefficients in front of the OperatorStrings.
             If all coefficients are real, then the operator
             is Hermitian.
-        op_strings : list of OperatorStrings, optional
+        op_strings : list of OperatorStrings or Basis, optional
             The OperatorStrings that make up this operator.
+            Note: if a list is provided, it is copied. However,
+            if a Basis is provided, it is stored by reference.
         op_type : str, optional
             The type of OperatorStrings that make up the 
             operator: 'Pauli', 'Majorana', or 'Fermion'.
@@ -327,7 +329,12 @@ class Operator:
         if op_strings is None:
             op_strings = []
 
-        self._basis  = Basis(list(op_strings)) # Copies the op_strings list.
+        if isinstance(op_strings, list):
+            self._basis  = Basis(list(op_strings)) # Copies the op_strings list.
+        elif isinstance(op_strings, Basis):
+            self._basis  = op_strings # Warning: Keeps a reference to the Basis. Does not copy.
+        else:
+            raise ValueError('Cannot create a Basis of OperatorStrings from an object of type: {}.'.format(type(op_strings)))
         self.op_type = op_type
 
         if len(self._basis.op_strings) != 0:
@@ -335,7 +342,7 @@ class Operator:
         elif len(self._basis.op_strings) == 0 and op_type is None:
             raise ValueError('Cannot create an empty (zero) operator without specifying the op_type.')
 
-    def remove_zeros(self, tol=1e-12):
+    def remove_zeros(self, tol=1e-16):
         """Remove OperatorStrings with zero coefficients
         from the Operator.
 

@@ -31,7 +31,7 @@ def _operation_opstring(op_string_A, op_string_B, operation_mode='commutator', t
     if operation_mode == 'product' \
        and (op_type == 'Pauli' or op_type == 'Majorana') \
        and (op_string_A == op_string_B):
-        return (1.0, OperatorString([], [], op_type=op_type))
+        return (1.0, OperatorString([], [], op_type=op_type)) # The identity operator.
     
     coeff = 1.0
     
