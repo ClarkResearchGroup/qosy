@@ -305,7 +305,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
             os_A = basisA[ind_os_A]
             
             (coeff, os_C) = _operation_opstring(os_A, os_B, operation_mode=operation_mode)
-
+            
             if np.abs(coeff) > tol:
                 basisC += os_C
                 ind_os_C = basisC.index(os_C)
@@ -314,7 +314,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
                 inds_os_A.append(ind_os_A)
                 data.append(coeff)
                 
-        matrix_data[os_B] = (inds_os_C, inds_os_A, data)
+        matrix_data[os_B] = [inds_os_C, inds_os_A, data]
 
     if return_data_tuple:
         result = matrix_data
@@ -326,7 +326,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
             result[os_B] = s_constants_B
 
     if return_extended_basis:
-        return (result, basisC)
+        return [result, basisC]
     else:
         return result
 

@@ -241,6 +241,7 @@ def diagonalize(operator, num_orbitals, mode='Hermitian', num_vecs=None):
     return (evals, evecs)
     
 # TODO: document, test, finish
+# NOTE: returns absolute values of single particle energies. Need to refactor.
 def diagonalize_quadratic(operator, num_orbitals, lattice=None, threshold=1e-12):
 
     op = operator
@@ -376,13 +377,18 @@ def diagonalize_quadratic_tightbinding(operator, num_orbitals, num_vecs=None):
             orb1 = os.orbital_labels[0]
             orb2 = os.orbital_labels[1]
 
-            data.append(coeff*os.prefactor)
-            row_inds.append(orb1)
-            col_inds.append(orb2)
+            if orb1 == orb2:
+                data.append(np.real(coeff*os.prefactor))
+                row_inds.append(orb1)
+                col_inds.append(orb2)
+            else:
+                data.append(coeff*os.prefactor)
+                row_inds.append(orb1)
+                col_inds.append(orb2)
 
-            data.append(np.conj(coeff*os.prefactor))
-            row_inds.append(orb2)
-            col_inds.append(orb1)
+                data.append(np.conj(coeff*os.prefactor))
+                row_inds.append(orb2)
+                col_inds.append(orb1)
         else:
             raise ValueError('Invalid tight-binding term in operator: {}'.format(os))
     tight_binding_hamiltonian = ss.csr_matrix((data, (row_inds, col_inds)), shape=(num_orbitals, num_orbitals), dtype=complex)

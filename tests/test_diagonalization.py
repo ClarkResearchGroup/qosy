@@ -362,13 +362,18 @@ def test_tight_binding():
     hamiltonian = qy.Operator(coeffs, op_strings)
 
     (gs_energy, evals_onebody, evecs_onebody, _) = qy.diagonalize_quadratic(hamiltonian, L*L)
+    (evals_onebody2, evecs_onebody2)             = qy.diagonalize_quadratic_tightbinding(hamiltonian, L*L)
 
     k = 2.0*np.pi/L * np.arange(L)
     (Kx,Ky) = np.meshgrid(k,k)
-    expected_evals_onebody = np.abs(-2.0*np.cos(Kx)-2.0*np.cos(Ky))
+    expected_evals_onebody = -2.0*np.cos(Kx)-2.0*np.cos(Ky)
     expected_evals_onebody = expected_evals_onebody.flatten()
     
-    print(evals_onebody)
-    print(expected_evals_onebody)
+    print(np.sort(evals_onebody))
+    print(np.sort(evals_onebody2))
+    print(np.sort(expected_evals_onebody))
 
-    assert(np.allclose(np.sort(expected_evals_onebody), np.sort(evals_onebody)))
+    # NOTE: diagonalize_quadratic returns the absolute value of the energies.
+    assert(np.allclose(np.sort(np.abs(expected_evals_onebody)), np.sort(evals_onebody)))
+    
+    assert(np.allclose(np.sort(expected_evals_onebody), np.sort(evals_onebody2)))
