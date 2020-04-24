@@ -9,6 +9,8 @@ Currently, this module only supports the conversion between strings
 of fermions and strings of Majorana fermions.
 """
 
+import warnings
+
 import itertools as it
 import numpy as np
 import scipy.sparse as ss
@@ -464,7 +466,7 @@ def conversion_matrix(basis_from, basis_to, tol=1e-16):
     """
 
     if len(basis_from) != len(basis_to):
-        raise ValueError('Cannot create an invertible transformation matrix between bases of different sizes: {} {}'.format(len(basis_from), len(basis_to)))
+        warnings.warn('Creating a non-invertible transformation matrix between bases of different sizes: {} {}'.format(len(basis_from), len(basis_to)))
 
     if len(basis_from) == 0:
         return ss.csc_matrix(dtype=complex,shape=(0,0))
@@ -488,7 +490,7 @@ def conversion_matrix(basis_from, basis_to, tol=1e-16):
                 col_inds.append(ind_from)
                 data.append(coeff)
 
-    conversion_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(basis_from), len(basis_to)))
+    conversion_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(basis_to), len(basis_from)))
 
     conversion_matrix.sum_duplicates()
     conversion_matrix.eliminate_zeros()

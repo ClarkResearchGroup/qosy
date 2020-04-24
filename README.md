@@ -36,6 +36,7 @@ To install, type
 cd qosy
 python setup.py install --user
 ```
+or add the qosy folder to your PYTHONPATH environment variable.
 
 ## Documentation
 
@@ -76,4 +77,6 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fo
 
 ## References
 
-Based on work described in ... <!--- [TODO: cite] -->
+Based on work presented in
+
+E. Chertkov, B. Villalonga, and B. K. Clark, “Engineering Topological Models with a General-Purpose Symmetry-to-Hamiltonian Approach,” [arXiv:1910.10165](http://arxiv.org/abs/1910.10165) (2019).
