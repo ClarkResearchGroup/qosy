@@ -100,7 +100,7 @@ def to_matrix(operator, num_orbitals):
 def to_vector(matrix, basis, num_orbitals):
     basis_matrices = [_to_matrix_opstring(op_string, num_orbitals) for op_string in basis]
     
-    overlaps = np.array([(matrix.H).dot(mat).diagonal().sum() for mat in basis_matrices], dtype=complex)
+    overlaps = np.array([(mat.H).dot(matrix).diagonal().sum()/(2.0**num_orbitals) for mat in basis_matrices], dtype=complex)
     
     return overlaps
     
