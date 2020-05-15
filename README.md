@@ -65,7 +65,7 @@ pytest
 
 ## Tutorials
 
-<!--- TODO: Create a few tutorials. At least two: one of forward method, one of inverse method. -->
+Some introductory ipython notebooks and scripts for generating results shown in [1] are available in the [tutorials](./tutorials/) folder.
 
 ## Authors
 
@@ -79,4 +79,4 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fo
 
 Based on work presented in
 
-E. Chertkov, B. Villalonga, and B. K. Clark, “Engineering Topological Models with a General-Purpose Symmetry-to-Hamiltonian Approach,” [arXiv:1910.10165](http://arxiv.org/abs/1910.10165) (2019).
+[1] E. Chertkov, B. Villalonga, and B. K. Clark, “Engineering Topological Models with a General-Purpose Symmetry-to-Hamiltonian Approach,” [arXiv:1910.10165](http://arxiv.org/abs/1910.10165) (2019).
