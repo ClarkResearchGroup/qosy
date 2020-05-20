@@ -445,12 +445,12 @@ class Operator:
         fmt : str, optional
             The array format to return the vector
             as. Specifying 'numpy' returns a ndarray
-            of shape (n,); 'csc' returns a scipy.sparse.csc_matrix
+            of shape (n,); 'csc' returns a scipy.sparse.csr_matrix
             of shape (n,1). Defaults to 'numpy'.
 
         Returns
         -------
-        ndarray or scipy.sparse.csc_matrix
+        ndarray or scipy.sparse.csr_matrix
             The vector representation of the Operator.
         """
 
@@ -472,7 +472,7 @@ class Operator:
                 data.append(coeff)
 
             col_inds = [0]*len(row_inds)
-            vector = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
+            vector = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(basis),1), dtype=complex)
             
             return vector
         else:

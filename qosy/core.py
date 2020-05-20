@@ -205,7 +205,7 @@ class SymmetricOperatorGenerator:
         A list that specifies whether to search for operators to 
         commute or anticommute with each symmetry. 'commutator' 
         means commutes, 'anticommutator' means anticommutes.
-    superoperators : list of scipy.sparse.csc_matrix
+    superoperators : list of scipy.sparse.csr_matrix
         A list of the "superoperators" (the commutant and 
         symmetry matrices) computed for each symmetry (Operator and 
         Transformation).
@@ -214,7 +214,7 @@ class SymmetricOperatorGenerator:
     eigenvectors : list of ndarray
         A list of the eigenvectors of the superoperators.
 
-    projected_superoperators : list of scipy.sparse.csc_matrix
+    projected_superoperators : list of scipy.sparse.csr_matrix
         The superoperators projected onto the symmetric operators
         generated from the previously considered symmetries.
     projected_eigenvalues : list of ndarray
@@ -378,7 +378,7 @@ class SymmetricOperatorGenerator:
                 proj_curr_ops = intersection(curr_ops, prev_ops)
 
                 # Compute the projected superoperator.
-                proj_curr_ops_sparse    = ss.csc_matrix(proj_curr_ops)
+                proj_curr_ops_sparse    = ss.csr_matrix(proj_curr_ops)
                 projected_superoperator = ((proj_curr_ops_sparse.H).dot(self.superoperators[ind_output])).dot(proj_curr_ops_sparse)
                 self.projected_superoperators.append(projected_superoperator)
                 

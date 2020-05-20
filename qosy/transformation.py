@@ -589,7 +589,7 @@ def _symmetry_matrix_opstrings(basis, transformation, tol=1e-12):
                 col_inds.append(indA)
                 data.append(coeff_B)
 
-    symmetry_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(dim_basis, dim_basis))
+    symmetry_matrix = ss.csr_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(dim_basis, dim_basis))
             
     return symmetry_matrix
 
@@ -616,10 +616,10 @@ def _symmetry_matrix_operators(operators, transformation, tol=1e-12):
             data.append(coeff)
             row_inds.append(operators_basis.index(os))
             col_inds.append(ind_op)
-    coeffs_operators = ss.csc_matrix((data, (row_inds, col_inds)), shape=(dim_basis, num_operators), dtype=complex)
+    coeffs_operators = ss.csr_matrix((data, (row_inds, col_inds)), shape=(dim_basis, num_operators), dtype=complex)
     
     # Calculate the Moore-Penrose pseudo-inverse using numpy.
-    pinv_operators = ss.csc_matrix(nla.pinv(coeffs_operators.toarray()))
+    pinv_operators = ss.csr_matrix(nla.pinv(coeffs_operators.toarray()))
     
     # Assemble the symmetry matrix in the combined Basis of OperatorStrings.
     symmetry_matrix_opstrings = _symmetry_matrix_opstrings(operators_basis, transformation, tol)
@@ -651,7 +651,7 @@ def symmetry_matrix(basis, transformation, tol=1e-12):
     
     Returns
     -------
-    scipy.sparse.csc_matrix of complex
+    scipy.sparse.csr_matrix of complex
         A sparse, not-necessarily-unitary complex matrix.
     """
 

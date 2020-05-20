@@ -70,7 +70,7 @@ def _to_matrix_opstring(op_string, num_orbitals, return_tuple=False):
         if return_tuple:
             return (row_inds, col_inds, data)
         else:
-            return ss.csc_matrix((data, (row_inds, col_inds)), shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
+            return ss.csr_matrix((data, (row_inds, col_inds)), shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
     else:
         raise NotImplementedError('Not finished yet.')
 
@@ -91,7 +91,7 @@ def to_matrix(operator, num_orbitals):
             col_inds += os_col_inds
             data     += new_os_data
             
-        result = ss.csc_matrix((data, (row_inds, col_inds)), shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
+        result = ss.csr_matrix((data, (row_inds, col_inds)), shape=(2**num_orbitals, 2**num_orbitals), dtype=complex)
         return result
     else:
         raise ValueError('Cannot convert an operator of type {} to a matrix.'.format(type(operator)))    

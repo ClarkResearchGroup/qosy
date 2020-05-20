@@ -269,11 +269,11 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
         Defaults to False.
     return_data_tuple : bool, optional
         Specifies whether to return tuples of (row, col, data)
-        instead of a scipy.sparse.csc_matrices.
+        instead of a scipy.sparse.csr_matrices.
 
     Returns
     -------
-    dict of scipy.sparse.csc_matrix or (dict of scipy.sparse.csc_matrix, Basis)
+    dict of scipy.sparse.csr_matrix or (dict of scipy.sparse.csr_matrix, Basis)
         If `return_extended_basis` is False, returns only 
         the structure constants, which are collected into
         a list of scipy sparse matrices. The dict is 
@@ -306,7 +306,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
             
             (coeff, os_C) = _operation_opstring(os_A, os_B, operation_mode=operation_mode)
             
-            if np.abs(coeff) > tol:
+            if os_C is not None and np.abs(coeff) >= tol:
                 basisC += os_C
                 ind_os_C = basisC.index(os_C)
                 
@@ -322,7 +322,7 @@ def structure_constants(basisA, basisB, operation_mode='commutator', return_exte
         result = dict()
         for os_B in basisB:
             (inds_os_C, inds_os_A, data) = matrix_data[os_B]
-            s_constants_B = ss.csc_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
+            s_constants_B = ss.csr_matrix((data, (inds_os_C, inds_os_A)), dtype=complex, shape=(len(basisC), len(basisA)))
             result[os_B] = s_constants_B
 
     if return_extended_basis:
@@ -336,7 +336,7 @@ def _liouvillian_matrix_opstrings(basis, operator, operation_mode, return_extend
     
     (s_constants, extended_basis) = structure_constants(basis, operator._basis, operation_mode=operation_mode, return_extended_basis=True)
     
-    liouvillian_matrix = ss.csc_matrix((len(extended_basis), len(basis)), dtype=complex)
+    liouvillian_matrix = ss.csr_matrix((len(extended_basis), len(basis)), dtype=complex)
     
     for (coeff, os) in operator:
         liouvillian_matrix += coeff * s_constants[os]
@@ -379,11 +379,11 @@ def _liouvillian_matrix_operators(operators, operator, operation_mode, return_ex
             data.append(coeff)
             row_inds.append(operators_basis.index(os))
             col_inds.append(ind_op)
-    coeffs_operators = ss.csc_matrix((data, (row_inds, col_inds)), shape=(len(operators_basis), num_operators), dtype=complex)
+    coeffs_operators = ss.csr_matrix((data, (row_inds, col_inds)), shape=(len(operators_basis), num_operators), dtype=complex)
 
     # Assemble the liouvillian matrix from the relevant structure constants
     # and convert to the list of Operators "basis".
-    liouvillian_matrix = ss.csc_matrix((len(extended_basis), num_operators), dtype=complex)
+    liouvillian_matrix = ss.csr_matrix((len(extended_basis), num_operators), dtype=complex)
     for (coeff, os) in operator:
         liouvillian_matrix += coeff * s_constants[os].dot(coeffs_operators)
 
@@ -419,7 +419,7 @@ def liouvillian_matrix(basis, operator, operation_mode='commutator', return_exte
 
     Returns
     -------
-    scipy.sparse.csc_matrix or (scipy.sparse.csc_matrix, Basis)
+    scipy.sparse.csr_matrix or (scipy.sparse.csr_matrix, Basis)
         The liouvillian matrix as a complex, sparse matrix.
 
     Examples
@@ -466,7 +466,7 @@ def commutant_matrix(basis, operator, operation_mode='commutator', return_extend
 
     Returns
     -------
-    scipy.sparse.csc_matrix or (scipy.sparse.csc_matrix, Basis)
+    scipy.sparse.csr_matrix or (scipy.sparse.csr_matrix, Basis)
         The commutant matrix as a complex, sparse matrix.
 
     Examples
@@ -579,7 +579,7 @@ def generate_lie_algebra(operators, tol=1e-12):
 
         # Express the operators as vectors
         # in the combined_basis.
-        vectors = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(combined_basis), len(operators)))
+        vectors = ss.csr_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(combined_basis), len(operators)))
 
         # For simplicity, orthogonalize the vectors.
         # V = columns are the vectors
@@ -638,9 +638,9 @@ def generate_lie_algebra(operators, tol=1e-12):
                 # Next, enlarge the vectors and the
                 # projector to the new Basis size.
                 if num_new_op_strings != 0:
-                    vectors = ss.vstack((vectors, ss.csc_matrix((num_new_op_strings, int(vectors.shape[1])), dtype=complex)), format='csc')
+                    vectors = ss.vstack((vectors, ss.csr_matrix((num_new_op_strings, int(vectors.shape[1])), dtype=complex)), format='csc')
                     #projector.resize((len(combined_basis), len(combined_basis)))
-                    projector = ss.block_diag((projector, ss.csc_matrix((num_new_op_strings,num_new_op_strings), dtype=complex)), format='csc')
+                    projector = ss.block_diag((projector, ss.csr_matrix((num_new_op_strings,num_new_op_strings), dtype=complex)), format='csc')
 
                 # Check whether opC is in the vector space
                 # currently spanned by vectors.
@@ -690,7 +690,7 @@ def _killing_form(operators):
 
     Returns
     -------
-    scipy.sparse.csc_matrix
+    scipy.sparse.csr_matrix
         The Killing form :math:`K_{ab}`.
     """
 
@@ -723,9 +723,9 @@ def _killing_form(operators):
                 data.append(-s_constants[os_a][ind_b, ind_c])
 
         # M_{a,(bc)}
-        matrix1 = ss.csc_matrix((data, (row_inds, col_inds_bc)), dtype=complex, shape=(dim_a, dim_b*dim_c))
+        matrix1 = ss.csr_matrix((data, (row_inds, col_inds_bc)), dtype=complex, shape=(dim_a, dim_b*dim_c))
         # M_{(cb),a}
-        matrix2 = ss.csc_matrix((data, (col_inds_cb, row_inds)), dtype=complex, shape=(dim_b*dim_c, dim_a))
+        matrix2 = ss.csr_matrix((data, (col_inds_cb, row_inds)), dtype=complex, shape=(dim_b*dim_c, dim_a))
 
         # K_{ab} = \sum_{cd} M_{a(cd)} M_{b(dc)}
         killing = matrix1.dot(matrix2)

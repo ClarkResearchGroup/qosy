@@ -425,7 +425,7 @@ def gram_schmidt(matrix, tol=0.0):
 
     Parameters
     ----------
-    matrix : ndarray or scipy.sparse.csc_matrix
+    matrix : ndarray or scipy.sparse.csr_matrix
         A matrix whose columns we want to orthogonalize
         going from left to right.
     tol : float, optional
@@ -435,7 +435,7 @@ def gram_schmidt(matrix, tol=0.0):
 
     Returns
     -------
-    ndarray or scipy.sparse.csc_matrix
+    ndarray or scipy.sparse.csr_matrix
         A unitary matrix whose columns are orthonormal vectors that
         form an orthonormal basis of the column space of the given matrix.
         The number of columns of the returned matrix can be smaller than
@@ -538,7 +538,7 @@ def sparsify(vectors, orthogonalize=True, tol=1e-12):
 
     Parameters
     ----------
-    vectors : ndarray or scipy.sparse.csc_matrix
+    vectors : ndarray or scipy.sparse.csr_matrix
         The vectors to sparsify.
     orthogonalize : bool, optional
         Specifies whether to make the sparsified vectors orthogonal.

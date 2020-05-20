@@ -450,7 +450,7 @@ def conversion_matrix(basis_from, basis_to, tol=1e-16):
 
     Returns
     -------
-    scipy.sparse.csc_matrix of complex
+    scipy.sparse.csr_matrix of complex
         A sparse, invertible basis transformation matrix.
 
     Examples
@@ -469,7 +469,7 @@ def conversion_matrix(basis_from, basis_to, tol=1e-16):
         warnings.warn('Creating a non-invertible transformation matrix between bases of different sizes: {} {}'.format(len(basis_from), len(basis_to)))
 
     if len(basis_from) == 0:
-        return ss.csc_matrix(dtype=complex,shape=(0,0))
+        return ss.csr_matrix(dtype=complex,shape=(0,0))
     
     to_op_type = basis_to.op_strings[0].op_type
     
@@ -490,7 +490,7 @@ def conversion_matrix(basis_from, basis_to, tol=1e-16):
                 col_inds.append(ind_from)
                 data.append(coeff)
 
-    conversion_matrix = ss.csc_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(basis_to), len(basis_from)))
+    conversion_matrix = ss.csr_matrix((data, (row_inds, col_inds)), dtype=complex, shape=(len(basis_to), len(basis_from)))
 
     conversion_matrix.sum_duplicates()
     conversion_matrix.eliminate_zeros()
