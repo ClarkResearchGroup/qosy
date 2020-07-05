@@ -79,4 +79,4 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fo
 
 Based on work presented in
 
-[1] E. Chertkov, B. Villalonga, and B. K. Clark, “Engineering Topological Models with a General-Purpose Symmetry-to-Hamiltonian Approach,” [arXiv:1910.10165](http://arxiv.org/abs/1910.10165) (2019).
+[1] E. Chertkov, B. Villalonga, and B. K. Clark, “Engineering Topological Models with a General-Purpose Symmetry-to-Hamiltonian Approach,” [Phys. Rev. Research 2, 023348 (2020)](https://doi.org/10.1103/PhysRevResearch.2.023348).
